@@ -2,6 +2,32 @@
 
 전체 설계와 공통 계약은 [PROJECT.md](PROJECT.md)를 따른다.
 
+## 에이전트 작업 명세
+
+먼저 [AGENTS.md](AGENTS.md) → [CONTRACTS.md](CONTRACTS.md)를 읽는다. 아래 단계가 작업 범위이며, 뒤의 기존 기능 체크리스트는 상세 인수 항목이다. **단계의 0/1/2와 체크리스트의 P0/P1 우선순위는 별개다.**
+
+### 담당 범위·단계·검증
+
+자기 소유: frontend/. backend, contracts, e2e는 수정하지 않는다. 생성 타입을 직접 작성하거나 서버 정책 검사를 화면 코드로 대체하지 않는다.
+
+| 단계 | 구현할 작업 | 단계 완료 증거 |
+|---|---|---|
+| F0 | React/TypeScript/Vite 설정·lockfile·테스트 설정, OpenAPI 타입 생성 스크립트, RequestView를 사용하는 mock API client, 요청/조건/후보 화면 기반 | 타입 생성 성공, build와 화면 테스트 통과, 누락·차단·대기 예시 표시 |
+| F1 | 실제 API 연결, 세션·CSRF, 조건 버전, Idempotency-Key 유지, 승인/거절/조회·새로고침 복구 | 정상·차단·stale·재시도 화면 테스트 통과 |
+| F2 | 실제 체인 상태·TX 링크·usage·이력 표시, QA E2E 수정 협업 | 실제 서버 데모와 build 통과, mock/live 표시 확인 |
+
+B0 이전에는 화면 구성과 테스트 사례를 설계한다. 공통 타입을 별도로 만들지 않는다. B0 이후 contracts/openapi.json에서 타입을 생성하고 contracts/examples를 mock에 사용한다. 미구현 API는 mock임을 표시하며 live 장애를 mock 성공으로 바꾸지 않는다.
+
+검증: `npm --prefix frontend run test -- --run`, `npm --prefix frontend run build`. F0에서 `npm --prefix frontend run generate:api` 명령을 구현하고 계약 변경 시 재실행한다. QA의 E2E 프로젝트는 읽고 실패 원인을 전달하되 직접 변경하지 않는다.
+
+### GPT에게 줄 시작 지시
+
+> 이 저장소의 Frontend 담당으로 작업해줘. AGENTS.md, PROJECT.md, CONTRACTS.md, ROLE_FRONTEND.md와 현재 코드를 읽고 F0 단계만 구현해줘. 공유 계약과 파일 소유권을 지키고 다른 역할 기능을 중복 구현하지 마. 의존성이 없으면 문서에 정한 준비 작업이나 fake를 사용하고 실제 연동으로 표시하지 마. 현재 단계의 테스트까지 수행한 뒤 AGENTS.md의 완료 보고 형식으로 결과와 다음 단계 진입 조건을 보고해줘.
+
+### 인계할 때
+
+현재 단계, 계약 버전, 변경 파일, 실제 실행한 명령과 결과, mock/live 여부, 다른 담당자에게 필요한 변경을 남긴다. 다음 작업은 이 보고와 저장된 코드를 기준으로 이어간다.
+
 ## 역할을 쉽게 설명하면
 
 사용자가 AI의 해석을 고치고, 구매가 허용되는 이유를 확인한 뒤 승인할 수 있는 화면을 만든다. 심사위원이 서비스의 정상 실행과 차단을 눈으로 이해하도록 표현하는 역할이다.

@@ -2,6 +2,32 @@
 
 전체 설계와 공통 계약은 [PROJECT.md](PROJECT.md)를 따른다.
 
+## 에이전트 작업 명세
+
+먼저 [AGENTS.md](AGENTS.md) → [CONTRACTS.md](CONTRACTS.md)를 읽는다. 아래 단계가 작업 범위이며, 뒤의 기존 기능 체크리스트는 상세 인수 항목이다. **단계의 0/1/2와 체크리스트의 P0/P1 우선순위는 별개다.**
+
+### 담당 범위·단계·검증
+
+자기 소유: catalog, simulator, data, 해당 테스트·통합 테스트, e2e, reports, scripts/qa. Backend DB 모델·트랜잭션·프론트 설정을 수정하지 않는다.
+
+| 단계 | 구현할 작업 | 단계 완료 증거 |
+|---|---|---|
+| D0 | 20~50개 Product fixture, 고정 시각, CatalogPort 검색/조회, SimulatorPort 순수 영수증 생성 | data 테스트 통과, fixture 전부 공통 모델 검증 |
+| D1 | API/모듈 통합 테스트, 반복·동시 승인·변경·외부 장애 사례, 별도 e2e npm 프로젝트/lockfile | 모의 전체 흐름 검증, 구매 1회 DB 증거, UI E2E |
+| D2 | 실제 Kiln/testnet 연결 검증·usage 집계·데모 증거·재현 안내 | mock/live 구분된 결과 보고서, 정상/차단 2회 재현 |
+
+Simulator는 approval 외에 Backend가 발급한 purchase_id, idempotency_key, now를 받는다. DB 쓰기나 중복 방지를 자체 구현하지 않는다. 중복 방지는 Backend와 통합 테스트로 검증한다. B0 전에는 데이터 사례와 테스트 표를 준비하고 공통 모델을 복제하지 않는다.
+
+검증: `python -m pytest backend/tests/data backend/tests/integration -q`, `npm --prefix e2e test`. D0는 data 테스트만 실행한다. D1에서 Playwright 설정·서버 시작 방법·브라우저 준비 방법을 e2e/README.md에 작성하고 UI E2E 명령이 실제 동작하게 한다. 테스트넷 키 없이 실행하는 기본 테스트와 live 테스트를 구분한다.
+
+### GPT에게 줄 시작 지시
+
+> 이 저장소의 Data / Integration / QA 담당으로 작업해줘. AGENTS.md, PROJECT.md, CONTRACTS.md, ROLE_DATA_INTEGRATION_QA.md와 현재 코드를 읽고 D0 단계만 구현해줘. 공유 계약과 파일 소유권을 지키고 다른 역할 기능을 중복 구현하지 마. 의존성이 없으면 문서에 정한 준비 작업이나 fake를 사용하고 실제 연동으로 표시하지 마. 현재 단계의 테스트까지 수행한 뒤 AGENTS.md의 완료 보고 형식으로 결과와 다음 단계 진입 조건을 보고해줘.
+
+### 인계할 때
+
+현재 단계, 계약 버전, 변경 파일, 실제 실행한 명령과 결과, mock/live 여부, 다른 담당자에게 필요한 변경을 남긴다. 다음 작업은 이 보고와 저장된 코드를 기준으로 이어간다.
+
 ## 역할을 쉽게 설명하면
 
 AI가 검색할 데이터를 만들고, 모의 구매 모듈을 구현하고, 네 명이 만든 기능을 실제 한 흐름으로 연결해 검증한다. 문서만 쓰는 역할이 아니라 데이터·시뮬레이터·통합 테스트를 개발하는 역할이다.
@@ -21,9 +47,9 @@ AI가 검색할 데이터를 만들고, 모의 구매 모듈을 구현하고, �
 
 ## P0 — Purchase Simulator
 
-- [ ] Backend와 `execute_simulated_purchase(approval, idempotency_key)` 반환 계약을 합의한다.
+- [ ] CONTRACTS의 SimulatorPort 인수·반환형을 그대로 구현한다.
 - [ ] 승인된 서버 스냅샷을 받아 purchase_id, 총액, executed_at, simulated=true 영수증을 만든다.
-- [ ] 동일 요청의 중복 실행을 DB 고유 제약/트랜잭션과 연동해 막는다.
+- [ ] Backend의 DB 고유 제약/트랜잭션과 통합 테스트해 동일 요청의 구매가 1회인지 검증한다. simulator 자체는 DB를 쓰지 않는다.
 - [ ] 지연·실패를 주입할 수 있는 테스트 옵션을 제공한다.
 - [ ] 실제 쇼핑몰 API나 실제 결제에 연결하지 않는다.
 - [ ] 체인 재시도와 구매 재시도를 분리해 동일 구매가 반복되지 않게 한다.

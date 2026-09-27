@@ -2,6 +2,32 @@
 
 전체 설계와 공통 계약은 [PROJECT.md](PROJECT.md)를 따른다.
 
+## 에이전트 작업 명세
+
+먼저 [AGENTS.md](AGENTS.md) → [CONTRACTS.md](CONTRACTS.md)를 읽는다. 아래 단계가 작업 범위이며, 뒤의 기존 기능 체크리스트는 상세 인수 항목이다. **단계의 0/1/2와 체크리스트의 P0/P1 우선순위는 별개다.**
+
+### 담당 범위·단계·검증
+
+자기 소유: backend/app/policy, backend/app/blockchain, 해당 테스트, chain/. DB·API 승인 흐름은 Backend에 맡긴다. 온체인 구현을 위해 공통 타입을 바꾸어야 하면 CONTRACTS 변경 요청으로 전달한다.
+
+| 단계 | 구현할 작업 | 단계 완료 증거 |
+|---|---|---|
+| P0 | PolicyPort 평가, 모든 규칙의 경계값·누락 fail-closed, 감사/정책/상품 해시 정규화와 테스트 벡터 | policy 테스트 통과, 고정 시각 재현, 원문 변경 시 해시 불일치 |
+| P1 | ChainPort mock·실제 adapter 구조, 허용 체인 확인 후 설정, record_id 중복 방지·pending/failed/unknown 조회 | blockchain 테스트 통과, 중복/timeout 복구 검증 |
+| P2 | 실제 testnet 배포/기록·receipt 확인, Backend outbox 연동, 감사 원문 대조 | 실제 성공 TX·receipt·원문 해시 일치 증거 |
+
+P0라는 단계 이름과 아래 체크리스트의 ‘P0 필수 우선순위’는 다르다. 실제 체인이 아직 정해지지 않아도 정책·정규화·mock부터 완성한다. 임의로 mainnet을 선택하거나 mock TX를 실제 TX로 보고하지 않는다. 네트워크 확정값과 지갑 준비 등 외부 선행 조건은 인계 보고에 적는다.
+
+검증: `python -m pytest backend/tests/policy backend/tests/blockchain -q`. 단계 P0에서는 policy만 실행해도 되며 blockchain은 미실행으로 기록한다. 실호출 테스트는 opt-in으로 분리하고 기록된 network/tx/receipt를 QA에 전달한다.
+
+### GPT에게 줄 시작 지시
+
+> 이 저장소의 Policy / Blockchain 담당으로 작업해줘. AGENTS.md, PROJECT.md, CONTRACTS.md, ROLE_POLICY_BLOCKCHAIN.md와 현재 코드를 읽고 P0 단계만 구현해줘. 공유 계약과 파일 소유권을 지키고 다른 역할 기능을 중복 구현하지 마. 의존성이 없으면 문서에 정한 준비 작업이나 fake를 사용하고 실제 연동으로 표시하지 마. 현재 단계의 테스트까지 수행한 뒤 AGENTS.md의 완료 보고 형식으로 결과와 다음 단계 진입 조건을 보고해줘.
+
+### 인계할 때
+
+현재 단계, 계약 버전, 변경 파일, 실제 실행한 명령과 결과, mock/live 여부, 다른 담당자에게 필요한 변경을 남긴다. 다음 작업은 이 보고와 저장된 코드를 기준으로 이어간다.
+
 ## 역할을 쉽게 설명하면
 
 AI가 추천한 행동이 사용자 규칙 안에 있는지 코드로 검사하고, 실행 결과를 테스트넷에서 검증할 수 있도록 기록하는 담당이다. AI의 추천이 틀려도 금지된 구매를 막는 것이 핵심이다.
@@ -37,7 +63,7 @@ AI가 추천한 행동이 사용자 규칙 안에 있는지 코드로 검사하�
 - [ ] 테스트넷 전용 지갑을 준비하고 필요한 테스트 토큰을 확보한다.
 - [ ] 감사 기록용 컨트랙트 또는 허용된 데이터 기록 방식을 선택한다.
 - [ ] 컨트랙트 방식이면 기록 권한을 제한하고 record_id 중복 기록을 거절한다.
-- [ ] submit_audit(record), get_receipt(tx_hash) 인터페이스를 제공한다.
+- [ ] CONTRACTS의 submit_audit(record), get_receipt(record) 인터페이스를 제공한다.
 - [ ] 제출된 tx_hash를 즉시 보존하고 PENDING 상태로 반환한다.
 - [ ] receipt의 성공 여부·블록 번호·합의한 확인 수를 확인한 뒤 CONFIRMED로 바꾼다.
 - [ ] RPC 타임아웃은 UNKNOWN으로 두고 기존 TX/record_id를 먼저 조회한다.

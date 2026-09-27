@@ -2,6 +2,32 @@
 
 전체 설계와 공통 계약은 [PROJECT.md](PROJECT.md)를 따른다.
 
+## 에이전트 작업 명세
+
+먼저 [AGENTS.md](AGENTS.md) → [CONTRACTS.md](CONTRACTS.md)를 읽는다. 아래 단계가 작업 범위이며, 뒤의 기존 기능 체크리스트는 상세 인수 항목이다. **단계의 0/1/2와 체크리스트의 P0/P1 우선순위는 별개다.**
+
+### 담당 범위·단계·검증
+
+자기 소유: CONTRACTS의 Backend 경로. 다른 역할의 catalog/simulator/policy/blockchain 구현은 만들지 않는다. 개발용 fake는 backend/tests/backend/fakes 또는 Backend 소유 orchestration의 명시적 mock 모드에 둔다.
+
+| 단계 | 구현할 작업 | 단계 완료 증거 |
+|---|---|---|
+| B0 | pyproject·설정·공통 Pydantic 모델·Protocol·API 골격·OpenAPI·상태별 JSON 예시·health·세션 계약. 공통 테스트 기반을 만든다 | contracts 테스트 통과, 예시 전부 validation 통과, health 확인, 팀이 import할 경로 공유 |
+| B1 | 요청/조건 확인/추천/승인 상태, 세션 소유권, CSRF, 버전 충돌, 원자적 구매·중복 방지, 영속 outbox 구현. 역할 모듈은 Protocol로 주입한다 | 정상·차단·stale·다른 세션·동시 승인·재시작 테스트 통과 |
+| B2 | 실제 Kiln/Qwen 호출, 실제 역할 모듈 연결, 체인 상태 복구·usage·실연동 증거 | QA E2E 통과, 실제 호출 및 TX 대응 로그 |
+
+B0에서는 전체 구매 서비스를 구현하지 않는다. 타입은 CONTRACTS의 추가 객체까지 포함한다. B1의 해시 처리는 P0 구현을 가져다 쓰며 정책 판정도 직접 복제하지 않는다. 외부 정보가 없으면 B2의 live 부분만 미완료로 기록한다.
+
+검증: B0는 `python -m pytest backend/tests/contracts -q`, B1/B2는 여기에 `python -m pytest backend/tests/backend -q`를 추가한다. 설치/실행 명령은 AGENTS를 따른다. 공유 모델 변경 시 OpenAPI·예시와 관련 역할의 계약 검증도 갱신한다.
+
+### GPT에게 줄 시작 지시
+
+> 이 저장소의 Backend / Agent 담당으로 작업해줘. AGENTS.md, PROJECT.md, CONTRACTS.md, ROLE_BACKEND_AGENT.md와 현재 코드를 읽고 B0 단계만 구현해줘. 공유 계약과 파일 소유권을 지키고 다른 역할 기능을 중복 구현하지 마. 의존성이 없으면 문서에 정한 준비 작업이나 fake를 사용하고 실제 연동으로 표시하지 마. 현재 단계의 테스트까지 수행한 뒤 AGENTS.md의 완료 보고 형식으로 결과와 다음 단계 진입 조건을 보고해줘.
+
+### 인계할 때
+
+현재 단계, 계약 버전, 변경 파일, 실제 실행한 명령과 결과, mock/live 여부, 다른 담당자에게 필요한 변경을 남긴다. 다음 작업은 이 보고와 저장된 코드를 기준으로 이어간다.
+
 ## 역할을 쉽게 설명하면
 
 서비스의 진행을 조정하는 담당이다. 사용자의 요청을 Qwen3-32B에 보내고, 상품 검색·정책 검사·승인·모의 구매·블록체인 기록을 순서대로 연결한다. AI를 학습시키는 역할이 아니라 Kiln API로 모델을 호출하고 그 결과를 검증하는 역할이다.

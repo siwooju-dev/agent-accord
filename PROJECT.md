@@ -2,6 +2,10 @@
 
 > 사용자가 정한 조건 안에서 상품을 추천하고, 승인받은 모의 구매와 그 증거를 테스트넷에 기록하는 AI 구매 에이전트.
 
+## 개발 에이전트가 읽을 순서
+
+[README.md](README.md) → [AGENTS.md](AGENTS.md) → [CONTRACTS.md](CONTRACTS.md) → 자기 역할 문서 순서로 읽는다. 이 문서는 전체 설명이며 타입·API·소유권·기술 기본값은 CONTRACTS와 AGENTS가 구체화한다. 아직 앱 코드는 없고, Backend B0에서 공유 코드 기반을 먼저 만든다. 역할별 첫 단계는 B0/F0/P0/D0다.
+
 ## 1. 프로젝트 목적과 문서 기준
 
 FuriosaAI Challenge A 해커톤을 위한 4인 팀 MVP 설계 문서다. AI에게 구매 업무를 맡겼을 때 의도를 잘못 이해하거나 허용 범위를 벗어나는 문제를 다룬다. Qwen3-32B는 자연어 해석과 추천을 담당하고, 일반 코드로 만든 Policy Engine이 실행 조건을 강제한다. 사용자는 조건과 최종 구매를 각각 확인한다.
@@ -148,7 +152,7 @@ approve는 `Idempotency-Key`를 받는다. 같은 키와 같은 본문은 같은
 오류 응답 공통 형태: `{ "error": { "code": "APPROVAL_STALE", "message": "조건이 변경되었습니다. 다시 확인해주세요." }, "request_id": "req-demo-001" }`.
 정책 차단은 정상적인 업무 결과로 반환하고, 인증/소유권 오류·상태 충돌·입력 오류·외부 서비스 장애와 구분한다.
 
-내부 인터페이스: `extract_policy(text, context)`, `search_products(policy)`, `recommend(policy, products)`, `evaluate(policy, product, now, purchase_count)`, `execute_simulated_purchase(approval, idempotency_key)`, `submit_audit(record)`, `get_receipt(tx_hash)`.
+내부 인터페이스의 정확한 인수·반환형은 [CONTRACTS.md](CONTRACTS.md) 5절을 따른다. HTTP API에는 `/api/v1` 접두사를 붙이며 공통 응답은 RequestView다.
 
 ## 7. 역할과 개발 순서
 
