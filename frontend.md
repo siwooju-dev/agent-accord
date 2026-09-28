@@ -1,6 +1,6 @@
 # 프론트엔드 담당 개발 명세
 
-> 개발 에이전트는 `project.md`, `api-spec.md`, 이 문서를 읽는다. 소유 영역은 `frontend/`다.
+> 개발 에이전트는 `project.md`, `api-spec.md`, 이 문서를 읽는다. 소유 영역은 `frontend/`다. React + TypeScript + Vite와 viem을 사용한다.
 
 ## 목표
 
@@ -20,6 +20,9 @@
 ## API·서명 계약
 
 - `api-spec.md`의 경로·권한·요청/응답을 기준으로 타입/클라이언트를 만든다. 백엔드 OpenAPI와 차이가 있으면 먼저 계약을 맞춘다. mock 데이터에는 `demo/mock` 표시를 붙인다.
+- `GET /api/negotiations/{id}`의 `assessments[].summary/findings`와 `offers[].rationale`을 구매자에게 표시한다. `GET /api/agreements/{id}`의 선택 매물 `assessment`와 선택 제안 `rationale`은 양측에 표시하되, 서명 대상인 `snapshot`과 시각적으로 구분한다. `consistent`는 작동·진품 검증으로 표현하지 않는다.
+- 개발 서버는 Vite의 `/api` 프록시를 `http://localhost:8000`으로 설정하고, 브라우저는 `/api` 상대 경로로 호출한다. API 키·relayer 개인키는 프론트 환경 변수에도 두지 않는다.
+- Base Sepolia(chain ID `84532`) 지갑 연결과 EIP-712 서명에는 viem을 사용한다. 브라우저 지갑의 계정으로 서명하고 개인키를 앱이 받거나 저장하지 않는다. 탐색기 링크의 기본 URL은 `https://sepolia.basescan.org`다.
 - 승인 가능 여부는 서버의 `status`, `valid`, `reason_code`를 따른다. 브라우저의 예산 검사는 입력 편의를 위한 보조 검사다.
 - `approval-payload`의 합의 ID, 해시, 금액, 배송/보증, 만료, 지갑 주소를 화면 내용과 대조한다. 다르면 서명 요청을 중단한다.
 - 구매자/판매자는 자기 지갑으로만 서명한다. 지갑 주소·chain ID가 합의안과 다르면 재확인한다. 서명 메시지 형식은 블록체인 담당이 제공한다.

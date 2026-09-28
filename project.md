@@ -26,7 +26,7 @@
 | 블록체인 | devnet/testnet 실제 트랜잭션 1건 이상, tx hash, 성공 영수증, 대응 이벤트/조회 기록 |
 | 조건 검증 | 기본 실행 뒤 사용자 조건을 바꾼 실행 2회, 차단/성공을 재구성할 수 있는 로그 |
 
-제공된 PDF에는 과거 모델명 `gpt-oss-120b`가 적혀 있고 팀이 전달받은 최신 기준은 `Qwen3-32B`다. [Kiln 공식 모델 문서](https://kiln.bricksum.com/docs/en/models)의 모델 ID는 `qwen3-32b`이며, 팀은 발급받은 키로 이 모델에 접근 가능하다는 안내를 받았다. 백엔드 연결 시 `GET /models` 확인과 실제 `POST /chat/completions` 호출 결과를 기록한다. Kiln 연결 규칙은 `api-spec.md` 8절을 따른다. 허용 체인은 운영진 최신 안내로 확정하고 변경 근거를 제출물에 남긴다. 모델 이름만 표시하는 모의 호출은 실제 Kiln 통합으로 간주하지 않는다.
+제공된 PDF에는 과거 모델명 `gpt-oss-120b`가 적혀 있고 팀이 전달받은 최신 기준은 `Qwen3-32B`다. [Kiln 공식 모델 문서](https://kiln.bricksum.com/docs/en/models)의 모델 ID는 `qwen3-32b`이며, 팀은 발급받은 키로 이 모델에 접근 가능하다는 안내를 받았다. 백엔드 연결 시 `GET /models` 확인과 실제 `POST /chat/completions` 호출 결과를 기록한다. Kiln 연결 규칙은 `api-spec.md` 8절을 따른다. 배포 체인은 아래의 Base Sepolia로 정했고 운영진이 다른 체인을 지정하면 변경 근거를 제출물에 남긴다. 모델 이름만 표시하는 모의 호출은 실제 Kiln 통합으로 간주하지 않는다.
 
 ## 구성
 
@@ -51,6 +51,21 @@ flowchart LR
 
 에이전트는 지갑 서명이나 최종 승인을 대신하지 않는다. 판매자 설명은 판매자 주장이다. 현재 Kiln 모델 목록에서 `qwen3-32b`는 이미지 입력을 지원하지 않으므로 MVP의 증빙 검토는 데이터 담당이 준비한 **텍스트·메타데이터**와 판매자 설명의 대조로 한정한다. 사진 원본을 모델이 직접 판독했다고 주장하지 않는다. AI는 기록 간 모순을 찾을 수 있지만 GPU의 진품·실제 작동을 확정할 수 없다.
 
+## 기술 스택·개발 환경 확정
+
+| 담당 | 기술 | 소유 경로 |
+| --- | --- | --- |
+| 프론트 | React + TypeScript + Vite, 지갑 연결·EIP-712 서명에 viem | `frontend/` |
+| 백엔드/AI | Python 3.12 + FastAPI/Pydantic, Kiln에 OpenAI Python SDK, 체인 RPC/계약 호출에 web3.py | `backend/` |
+| 데이터 | Python 표준 `sqlite3` + SQLite; SQL 초기화·시드·저장소 함수 | `data/` |
+| 블록체인 | Solidity + Foundry + OpenZeppelin EIP712/ECDSA, Python 체인 어댑터 | `contracts/`, `blockchain/` |
+
+백엔드는 `data/`의 저장소 함수와 `blockchain/`의 어댑터를 호출한다. 프론트는 `/api` 상대 경로로 호출하고 개발 중 Vite가 `http://localhost:8000`의 FastAPI로 프록시한다. 백엔드 앱 진입점은 `backend/main.py`이며 저장소 루트에서 `python -m uvicorn backend.main:app --reload --port 8000`으로 실행한다. 프론트는 npm을 사용하며 `frontend/`에서 `npm run dev`로 실행한다. DB 기본 경로는 `data/demo.sqlite3`, 계약 빌드·테스트는 `contracts/`에서 `forge build`·`forge test`다. 백엔드는 FastAPI가 생성한 `/openapi.json`을 제공한다. 의존성은 프론트 `package-lock.json`, 백엔드 `requirements.txt`, 계약 `foundry.toml`과 고정된 라이브러리 버전으로 관리한다. 프론트는 지갑 개인키를 받거나 저장하지 않는다.
+
+## 테스트넷 확정
+
+MVP 배포 대상은 **Base Sepolia**다. chain ID `84532`, 기본 공개 RPC `https://sepolia.base.org`, 탐색기 `https://sepolia.basescan.org`를 사용한다. 공개 RPC가 불안정하면 같은 체인의 다른 RPC로 `CHAIN_RPC_URL`만 교체한다. 로컬 개발은 Foundry Anvil을 사용하되 제출 증거는 Base Sepolia의 실제 tx여야 한다. 운영진이 특정 체인을 지정하면 그 요구에 맞춰 환경 설정·서명 도메인·계약 배포를 함께 변경한다. Base Sepolia 가스는 테스트 ETH로 충당한다. [Base chain ID](https://docs.base.org/base-chain/api-reference/ethereum-json-rpc-api/eth_chainId) · [Base Sepolia RPC 예시](https://docs.base.org/cookbook/use-case-guides/finance/access-real-time-asset-data-pyth-price-feeds/) · [BaseScan](https://docs.basescan.org/sepolia-basescan)
+
 ## 공통 데이터 계약 v0
 
 금액은 정수 KRW, 시간은 UTC ISO 8601, ID는 고유 문자열이다. API·DB·체인 간 필드 변경은 이 문서를 먼저 갱신하고 네 담당자에게 알린다.
@@ -61,7 +76,8 @@ flowchart LR
 | `SellerPolicy` | `seller_id`, `listing_id`, `min_item_price_krw`, `earliest_delivery_at` | 최저가는 해당 판매자와 서버만 열람 |
 | `Listing` | `id`, `seller_id`, `gpu_model`, `asking_price_krw`, `shipping_fee_krw`, `condition_text`, `warranty_end`, `stock_status`, `evidence_ids` | 공개 매물; 원문과 수정 이력 유지 |
 | `Evidence` | `id`, `listing_id`, `kind`, `source`, `ref`, `sha256`, `verification_status` | 상태는 `seller_claimed/checked/conflicted/unknown`; AI 열람만으로 `checked`가 되지 않음 |
-| `Offer` | `id`, `negotiation_id`, `listing_id`, `round`, `proposer`, `item_price_krw`, `shipping_fee_krw`, `total_krw`, `delivery_by`, `warranty_terms`, `expires_at`, `evidence_ids` | 모델 출력은 초안; 서버 검증 통과 후 노출 |
+| `ListingAssessment` | `flow_id`, `listing_id`, `summary`, `findings`, `source` | 근거별 `consistent/conflicted/unverified` 판정; `consistent`는 실물 검증을 뜻하지 않음 |
+| `Offer` | `id`, `negotiation_id`, `listing_id`, `round`, `proposer`, `item_price_krw`, `shipping_fee_krw`, `total_krw`, `delivery_by`, `warranty_terms`, `expires_at`, `evidence_ids`, `rationale` | 모델 출력은 초안; 서버 검증 통과 후 노출; 설명은 공개 가능한 내용만 |
 | `Agreement` | `id`, `offer_id`, `snapshot`, `snapshot_hash`, `buyer_wallet`, `seller_wallet`, `buyer_signature`, `seller_signature`, `status`, `tx_hash` | 양측은 동일한 불변 스냅샷에 서명 |
 | `AuditEvent` | `id`, `flow_id`, `at`, `actor`, `event_type`, `object_id`, `decision`, `reason_code` | 조건 검사·차단·승인·체인 결과를 순서대로 재구성 |
 | `ModelUsage` | `flow_id`, `actor`, `step`, `model_id`, `request_id`, `input_tokens`, `output_tokens`, `latency_ms`, `source` | `source`로 API 실측과 추정 구분 |
@@ -83,7 +99,7 @@ flowchart LR
 
 ## 서명·온체인 기록의 의미
 
-기본 설계는 **운영진이 허용하는 EVM 호환 devnet/testnet**이다. 정확한 체인은 최신 안내로 결정한다. EVM인 경우 양측은 EIP-712 형식의 동일한 `snapshot_hash`, 당사자 주소, 합의 총액, nonce, 만료 시각에 서명한다. 계약은 서명자·만료·중복을 확인하고 합의 해시, 당사자 주소, 합의 총액, 기록 시각을 저장하며 이벤트를 발행한다. 온체인에는 사진 원본, 연락처, 배송지, 비공개 가격 한계, 개인키를 올리지 않는다.
+배포 대상은 **Base Sepolia**다. 양측은 EIP-712 형식의 동일한 `snapshot_hash`, 당사자 주소, 합의 총액, nonce, 만료 시각에 서명한다. 계약은 서명자·만료·중복을 확인하고 합의 해시, 당사자 주소, 합의 총액, 기록 시각을 저장하며 이벤트를 발행한다. 온체인에는 사진 원본, 연락처, 배송지, 비공개 가격 한계, 개인키를 올리지 않는다.
 
 이 설계가 증명하는 것은 **두 주소가 같은 합의 해시에 서명했고 그 기록이 체인에 포함됐다는 사실**이다. 서버가 모든 제안을 보는 MVP는 입찰 비밀성이나 경매 공정성을 암호학적으로 증명한다고 주장하지 않는다. 커밋-공개 방식은 후속 범위다.
 
@@ -95,7 +111,7 @@ HTTP 요청·응답, 권한, 오류, 승인 서명 형식의 상세 계약은 `a
 | --- | --- | --- |
 | 데모 사용자 선택 | `POST /api/demo/sessions` | 가상 계정 세션 |
 | 구매 조건/매물 등록 | `POST /api/buyer-intents`, `POST /api/listings` | 생성 ID |
-| 협상 시작/조회 | `POST /api/negotiations`, `GET /api/negotiations/{id}` | 상태, 유효 제안, 근거·차단 이유 |
+| 협상 시작/조회 | `POST /api/negotiations`, `GET /api/negotiations/{id}` | 상태, 매물 평가·근거, 유효 제안·협상 이유, 차단 이유 |
 | 내 합의 목록 | `GET /api/agreements` | 승인 대기·완료 합의 |
 | 승인 자료/결정 | `GET /api/agreements/{id}/approval-payload`, `POST /api/agreements/{id}/decisions` | 동일 스냅샷·서명 데이터, 승인/거절 상태 |
 | 합의/감사 조회 | `GET /api/agreements/{id}`, `GET /api/flows/{id}/audit` | 양측 승인, tx hash/영수증, 사건·토큰 내역 |
@@ -121,8 +137,8 @@ HTTP 요청·응답, 권한, 오류, 승인 서명 형식의 상세 계약은 `a
 | --- | --- | --- | --- |
 | 프론트 | `project.md` → `frontend.md` | `frontend/` | 조건/협상/승인/영수증 UI, 지갑 서명 |
 | 백엔드/AI | `project.md` → `backend-ai-agent.md` | `backend/` API·서비스·Kiln | OpenAPI, 협상/정책 엔진, 감사/사용량 |
-| 데이터 | `project.md` → `data.md` | DB 스키마·초기화·시드·저장소 | 스키마, 가상 매물, 조회·기록 기능 |
-| 블록체인 | `project.md` → `blockchain.md` | `contracts/`·체인 어댑터 | 계약, 서명 규격, 배포/tx 검증 |
+| 데이터 | `project.md` → `data.md` | `data/` DB 스키마·초기화·시드·저장소 | 스키마, 가상 매물, 조회·기록 기능 |
+| 블록체인 | `project.md` → `blockchain.md` | `contracts/`·`blockchain/` 체인 어댑터 | 계약, 서명 규격, 배포/tx 검증 |
 
 공통 객체와 예시 응답을 먼저 합의한 뒤 각 역할이 병렬 구현한다. 다른 역할의 소유 파일을 임의로 덮어쓰지 않는다. 키·토큰·개인키는 환경 변수/비밀 저장소만 사용한다. 각 개발 에이전트는 보고 시 변경 파일, 실행한 검증, 실제/모의 외부 호출, 남은 제약과 필요한 인계를 명시한다.
 

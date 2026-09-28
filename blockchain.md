@@ -1,6 +1,6 @@
 # 블록체인 담당 개발 명세
 
-> 개발 에이전트는 `project.md`, `api-spec.md`의 승인 페이로드, 이 문서를 읽는다. `contracts/`와 체인 어댑터가 소유 영역이다.
+> 개발 에이전트는 `project.md`, `api-spec.md`의 승인 페이로드, 이 문서를 읽는다. `contracts/`의 Solidity + Foundry 계약과 `blockchain/`의 Python web3.py 어댑터가 소유 영역이다. 계약의 서명 검증에는 OpenZeppelin EIP712/ECDSA를 사용한다.
 
 ## 목표
 
@@ -8,7 +8,7 @@
 
 ## 네트워크·키
 
-- 운영진이 허용한 체인을 먼저 확인한다. 기본 설계는 EVM 호환 devnet/testnet과 스마트 계약이다. chain ID, RPC, 익스플로러, 계약 주소, 배포 tx를 환경별 설정으로 제공한다.
+- 배포 대상은 Base Sepolia(chain ID `84532`), 기본 RPC는 `https://sepolia.base.org`, 탐색기는 `https://sepolia.basescan.org`다. 로컬 테스트에는 Foundry Anvil을 사용한다. 운영진이 다른 체인을 지정하면 공통 설정과 서명 도메인을 갱신한다. chain ID, RPC, 탐색기, 계약 주소, 배포 tx를 환경별 설정으로 제공한다.
 - relayer 개인키·RPC 비밀값은 환경 변수/비밀 저장소에 두고 저장소/공개 로그에 남기지 않는다. 테스트 자산만 사용한다.
 - 실제 동작의 증거는 **합의 기록 tx hash + 성공 영수증 + 이벤트 + 계약 조회값**이다. 로컬 mock hash는 온체인 증거가 아니다.
 
@@ -35,9 +35,11 @@ EVM MVP는 EIP-712 typed data를 사용한다. 도메인: `name`, `version`, `ch
 
 서명 규격과 테스트 벡터를 프론트·백엔드·데이터 담당에게 먼저 전달한다. 서버 relayer 지갑은 제출 비용만 부담한다. **서버가 만든 단일 서명은 양측 승인 증거가 아니다.**
 
+`contracts/`에서 `forge build`·`forge test`를 실행할 수 있게 하고, 백엔드가 쓰는 계약 ABI는 `blockchain/abi/`에 버전 관리한다. Foundry 빌드 산출물 경로를 백엔드가 직접 읽게 하지 않는다.
+
 ## 구현 순서·테스트
 
-1. 허용 체인과 메시지·스냅샷 규격 확정, 해시 골든 벡터 공유.
+1. Base Sepolia 설정과 메시지·스냅샷 규격 확정, 해시 골든 벡터 공유.
 2. 로컬 체인에서 정상 양측 서명, 잘못된 주소/체인/계약/해시, 만료, nonce 재사용, 중복 제출 테스트.
 3. 실제 devnet/testnet 배포, 백엔드 어댑터로 기록 tx 전송.
 4. 성공 영수증, `AgreementRecorded` 이벤트, 계약 조회와 DB 합의 ID/해시 대조.

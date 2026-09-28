@@ -8,7 +8,7 @@
 - ID는 서버가 만든 문자열이다. 요청에 소유자 ID를 넣어도 신뢰하지 않고 세션에서 결정한다. 구매자 최고예산·판매자 최저가는 상대 사용자/에이전트에게 반환하지 않는다.
 - MVP 인증은 **가상 계정용 데모 세션**이다. `Authorization: Bearer <demo_token>`을 쓴다. `POST /api/demo/sessions`는 통제된 데모 환경에서만 켠다. 실제 사용자 인증이나 운영 환경의 보안을 주장하지 않는다.
 - `snapshot_hash`와 증빙 해시는 각각 SHA-256 32바이트를 `0x` + 64자리 16진수로 표시한다. 합의 스냅샷은 [RFC 8785 JCS](https://www.rfc-editor.org/rfc/rfc8785.html)로 정규화한 UTF-8 바이트를 해시한다. 스냅샷 필드와 타입은 아래 4절에서 고정한다.
-- 실제 체인 ID/계약 주소는 운영진 안내 뒤 환경 설정으로 넣는다. Kiln의 공개 API 경로와 모델 ID는 8절을 따른다. 아래 예시는 구조 설명용 가상 데이터이며 실제 요청 ID, 서명 또는 트랜잭션이 아니다.
+- 체인은 Base Sepolia(chain ID `84532`)로 정한다. 계약 주소는 배포 후 환경 설정으로 넣는다. Kiln의 공개 API 경로와 모델 ID는 8절을 따른다. 아래 예시는 구조 설명용 가상 데이터이며 실제 요청 ID, 서명 또는 트랜잭션이 아니다.
 - 성공 응답에는 `request_id`를 포함한다. 오류 형식은 7절을 따른다. 변경된 구매 조건은 기존 의도를 수정하지 않고 **새 `BuyerIntent`를 등록**해 별도 `flow_id`로 실행한다.
 
 ## 2. 경로 목록과 접근 권한
@@ -36,7 +36,8 @@
 | `Listing` | `id`, `seller_id`, `gpu_model`, `asking_price_krw`, `shipping_fee_krw`, `condition_text`, `warranty_end: date|null`, `stock_status`, `evidence_ids` | `stock_status`는 `available/sold`; 구매자에게 판매자 최저가 미노출 |
 | `SellerPolicy` | `listing_id`, `min_item_price_krw`, `earliest_delivery_at: datetime` | 최저 상품가는 0보다 크고 최초 호가 이하; 해당 판매자와 서버만 열람 |
 | `Evidence` | `id`, `kind`, `source`, `ref`, `sha256`, `verification_status` | `seller_claimed/checked/conflicted/unknown`; 해시와 원본 참조를 유지 |
-| `Offer` | `id`, `listing_id`, `round`, `proposer`, `item_price_krw`, `shipping_fee_krw`, `total_krw`, `delivery_by`, `warranty_terms`, `expires_at`, `evidence_ids`, `valid` | 서버가 총액과 조건을 재계산·검사한 후 `valid=true`만 승인 가능 |
+| `ListingAssessment` | `flow_id`, `listing_id`, `summary`, `findings[]`, `source` | `source=kiln/mock`; 각 finding은 `evidence_id: string|null`, `verdict: consistent/conflicted/unverified`, `note: string` |
+| `Offer` | `id`, `negotiation_id`, `listing_id`, `round`, `proposer`, `item_price_krw`, `shipping_fee_krw`, `total_krw`, `delivery_by`, `warranty_terms`, `expires_at`, `evidence_ids`, `rationale`, `valid` | `rationale`은 공개 가능한 협상 이유; 서버가 총액과 조건을 재계산·검사한 후 `valid=true`만 승인 가능 |
 | `ModelUsage` | `actor`, `step`, `model_id`, `request_id`, `input_tokens`, `output_tokens`, `latency_ms`, `source` | `request_id`는 Kiln의 `X-Neocloud-Generation-Id` 헤더 값; `source=api/estimated`로 실제/추정 구분 |
 
 MVP 수수료는 `0 KRW`다. 따라서 `total_krw = item_price_krw + shipping_fee_krw`이다. 수수료가 생기면 제안·스냅샷·정책 검사 필드를 함께 버전 변경한다. 서버 검사는 총액이 구매자 예산 이하, 상품가가 해당 판매자 최저가 이상, 제안 배송 시각이 판매자의 `earliest_delivery_at` 이상이면서 구매자 기한 이하, 재고와 필수 조건이 유효한지 확인한다. `warranty_active`는 입력된 보증 만료일 검사이며 보증의 진위를 뜻하지 않는다. AI의 계산값만 신뢰하지 않는다.
@@ -98,21 +99,35 @@ MVP 수수료는 `0 KRW`다. 따라서 `total_krw = item_price_krw + shipping_fe
   "id": "neg-demo-1",
   "flow_id": "flow-demo-1",
   "status": "AWAITING_APPROVALS",
+  "assessments": [{
+    "flow_id": "flow-demo-1",
+    "listing_id": "listing-demo-1",
+    "summary": "게임용 사용이라는 설명과 보증서 기록을 비교함. 작동 상태는 미확인.",
+    "findings": [{
+      "evidence_id": "evidence-demo-1", "verdict": "consistent",
+      "note": "보증서의 모델명과 매물 모델명이 일치함. 진품 확인은 아님."
+    }],
+    "source": "kiln"
+  }],
   "offers": [{
-    "id": "offer-demo-1", "listing_id": "listing-demo-1", "round": 1,
+    "id": "offer-demo-1", "negotiation_id": "neg-demo-1",
+    "listing_id": "listing-demo-1", "round": 1,
     "proposer": "seller", "item_price_krw": 450000,
     "shipping_fee_krw": 10000, "total_krw": 460000,
     "delivery_by": "2026-10-03T12:00:00Z",
     "warranty_terms": "판매자 제공 보증서 기준",
     "expires_at": "2026-10-01T12:00:00Z",
-    "evidence_ids": ["evidence-demo-1"], "valid": true
+    "evidence_ids": ["evidence-demo-1"],
+    "rationale": "배송 기한을 충족하고 제시된 보증 조건을 반영해 총액 46만 원을 제안함.",
+    "valid": true
   }],
   "blocked_events": [{"reason_code": "DEADLINE_MISSED"}],
+  "selected_offer_id": "offer-demo-1",
   "agreement_id": "agreement-demo-1"
 }
 ```
 
-`offers`에는 서버 검사를 통과한 제안만 넣는다. 차단된 제안은 비공개 금액 없이 `reason_code`만 반환한다. `NO_MATCH/BLOCKED`는 정상적인 종료 상태이며 `agreement_id=null`이다. Kiln 장애는 감사 로그에 남기고 가짜 제안을 만들지 않는다.
+`assessments`는 후보 매물의 AI 텍스트·메타데이터 평가이며 `consistent`는 진품이나 작동 확인이 아니다. `offers`에는 서버 검사를 통과한 제안만 넣는다. `rationale`은 서버가 공개 매물·유효 제안·평가 정보만으로 만든 설명이다. 비공개 한계값을 본 에이전트의 원문 설명을 그대로 공개하지 않는다. 차단된 제안은 비공개 금액 없이 `reason_code`만 반환한다. `NO_MATCH/BLOCKED`는 정상적인 종료 상태이며 `selected_offer_id=null`, `agreement_id=null`이다. Kiln 장애는 감사 로그에 남기고 가짜 제안을 만들지 않는다.
 
 ### 4.6 `GET /api/agreements?status=...`
 
@@ -120,7 +135,7 @@ MVP 수수료는 `0 KRW`다. 따라서 `total_krw = item_price_krw + shipping_fe
 
 ### 4.7 `GET /api/agreements/{id}`
 
-해당 구매자/선택 판매자만 호출한다. 응답은 `id`, `flow_id`, `offer_id`, `status`, **동일한 `snapshot`과 `snapshot_hash`**, `buyer_approved`, `seller_approved`, `chain`을 포함한다. `chain`은 다음 중 하나다.
+해당 구매자/선택 판매자만 호출한다. 응답은 `id`, `flow_id`, `offer_id`, `status`, **동일한 `snapshot`과 `snapshot_hash`**, `assessment`(선택 매물의 `ListingAssessment`), `rationale`(선택 제안의 공개 협상 이유), `buyer_approved`, `seller_approved`, `chain`을 포함한다. `assessment`와 `rationale`은 설명용이며 서명 대상은 불변 `snapshot`이다. `chain`은 다음 중 하나다.
 
 | 상태 | `chain`의 필드 |
 | --- | --- |
@@ -218,7 +233,7 @@ Kiln 공개 설정값은 `KILN_BASE_URL=https://api.bricksum.com/v1`, `KILN_MODE
 
 현재 Kiln의 `qwen3-32b`는 구조화 출력과 강제 도구 호출을 지원하지 않는다. `response_format`에 의존하지 말고 JSON 응답을 프롬프트로 요청한 다음 파싱·스키마 검증한다. `finish_reason=length`, 빈 내용, 유효하지 않은 JSON은 정상 제안으로 취급하지 않는다. 응답의 `usage.prompt_tokens`, `usage.completion_tokens`, `usage.total_tokens`와 `X-Neocloud-Generation-Id` 헤더를 흐름별 사용량 로그에 저장한다. `request_id`는 이 공급자 생성 ID를 가리키며 우리 HTTP 응답의 `request_id`와 구별한다. Kiln 401/402/403/404/429 또는 연결 장애를 가짜 협상 성공으로 대체하지 않는다.
 
-체인 설정 키는 `CHAIN_RPC_URL`, `CHAIN_ID`, `CONTRACT_ADDRESS`, `RELAYER_PRIVATE_KEY`다. 공개 기본값과 빈 비밀값 예시는 `.env.example`에 둔다. 실제 키와 개인키의 값은 Git·문서·API 응답에 넣지 않는다. mock 연결과 실제 Kiln/체인 연결은 실행 모드와 로그에서 명확히 구별한다. Kiln의 동작이 바뀌면 [API 참조](https://kiln.bricksum.com/docs/en/api-reference), [모델 목록](https://kiln.bricksum.com/docs/en/models), [Chat Completions](https://kiln.bricksum.com/docs/en/api-reference/chat-completions)을 다시 확인한다.
+체인 설정 키는 `CHAIN_RPC_URL=https://sepolia.base.org`, `CHAIN_ID=84532`, `CHAIN_EXPLORER_URL=https://sepolia.basescan.org`, `CONTRACT_ADDRESS`, `RELAYER_PRIVATE_KEY`다. 공개 기본값과 빈 비밀값 예시는 `.env.example`에 둔다. 백엔드는 `web3.py`로 RPC·계약을 연결하고 체인 ID를 확인한다. 실제 키와 개인키의 값은 Git·문서·API 응답에 넣지 않는다. mock 연결과 실제 Kiln/체인 연결은 실행 모드와 로그에서 명확히 구별한다. Kiln의 동작이 바뀌면 [API 참조](https://kiln.bricksum.com/docs/en/api-reference), [모델 목록](https://kiln.bricksum.com/docs/en/models), [Chat Completions](https://kiln.bricksum.com/docs/en/api-reference/chat-completions)을 다시 확인한다.
 
 ## 9. 역할별 구현 인계
 

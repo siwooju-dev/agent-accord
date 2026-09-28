@@ -1,6 +1,6 @@
 # 데이터 담당: 단기 MVP 작업 명세
 
-> 개발 에이전트는 `project.md`의 공통 데이터 계약과 `api-spec.md`의 공개/비공개 응답 규칙을 읽는다. 이 문서는 시연에 필요한 데이터와 DB 작업만 다룬다.
+> 개발 에이전트는 `project.md`의 공통 데이터 계약과 `api-spec.md`의 공개/비공개 응답 규칙을 읽는다. 소유 영역은 `data/`다. Python 3.12 표준 `sqlite3`와 SQLite를 사용한다.
 
 ## 목표
 
@@ -8,11 +8,11 @@
 
 ## 해야 할 일
 
-1. `project.md`의 `BuyerIntent`, `SellerPolicy`, `Listing`, `Evidence`, `Offer`, `Agreement`, `AuditEvent`, `ModelUsage`를 저장할 간단한 DB 스키마를 만든다. 단기 시연의 기본 DB는 SQLite로 한다.
-2. 빈 DB에 테이블을 만드는 초기화 명령과, 가상 데이터를 넣는 시드 명령을 만든다. 같은 시드를 다시 실행해도 중복 매물이 생기지 않게 한다.
+1. `project.md`의 `BuyerIntent`, `SellerPolicy`, `Listing`, `Evidence`, `ListingAssessment`, `Offer`, `Agreement`, `AuditEvent`, `ModelUsage`를 저장할 간단한 SQLite 스키마를 만든다.
+2. 기본 DB 경로는 `data/demo.sqlite3`다. 빈 DB에 테이블을 만드는 `python -m data.init_db`와 가상 데이터를 넣는 `python -m data.seed` 명령을 만든다. 같은 시드를 다시 실행해도 중복 매물이 생기지 않게 한다.
 3. 백엔드가 사용할 **매물 검색·제안/합의 저장·실행 기록 조회** 함수를 제공한다. 모델·재고·배송 조건은 정확한 DB 필터로 검색한다.
 4. 구매자 최고예산과 판매자 최저가는 소유자/서버 전용으로 저장한다. 상대 에이전트용 조회 결과와 공개 API 응답에는 넣지 않는다.
-5. 판매자 설명과 증빙의 원문·출처·확인 상태를 저장한다. 확인 상태는 `seller_claimed`, `checked`, `conflicted`, `unknown`을 사용하고, AI가 읽었다는 이유만으로 `checked`로 바꾸지 않는다.
+5. 판매자 설명과 증빙의 원문·출처·확인 상태를 저장한다. 확인 상태는 `seller_claimed`, `checked`, `conflicted`, `unknown`을 사용하고, AI가 읽었다는 이유만으로 `checked`로 바꾸지 않는다. 흐름별 `ListingAssessment`의 `summary`, `findings`, `source`와 `Offer.rationale`도 보존한다. finding의 `consistent`는 증빙의 `checked`와 다르다.
 6. 합의 스냅샷·해시, 양측 승인, tx hash, 서버 차단 이유, 단계별 Kiln 토큰 사용량을 `flow_id`로 연결해 저장한다. 합의 해시 계산·서명 검증은 백엔드/블록체인 담당이 맡는다.
 
 ## 시연 데이터

@@ -1,6 +1,6 @@
 # 백엔드·AI 에이전트 담당 개발 명세
 
-> 개발 에이전트는 `project.md`, `api-spec.md`, 이 문서를 읽는다. 소유 영역은 `backend/`의 API·서비스·Kiln 연결이다.
+> 개발 에이전트는 `project.md`, `api-spec.md`, 이 문서를 읽는다. 소유 영역은 `backend/`의 API·서비스·Kiln 연결이다. Python 3.12, FastAPI/Pydantic, OpenAI Python SDK, web3.py를 사용한다.
 
 ## 목표
 
@@ -40,7 +40,7 @@ print(resp.choices[0].message.content)
 
 1. 구매자/판매자의 자기 데이터 접근 권한과 입력 형식을 검사한다.
 2. DB에서 모델·재고·배송 조건으로 후보를 찾는다. 후보가 없으면 Kiln을 호출하지 않고 `NO_MATCH`를 남긴다.
-3. `api-spec.md` 8절의 Kiln 설정을 서버에만 주입한다. 발급받은 키로 `GET /models`에서 `qwen3-32b` 사용 가능 여부를 확인한 뒤 `POST /chat/completions`로 평가·협상한다. 응답의 `usage.prompt_tokens`·`usage.completion_tokens`, `X-Neocloud-Generation-Id` 헤더, 지연 시간, 호출 단계와 결과 반영 내용을 저장한다. API가 사용량을 제공하지 않으면 추정값으로 표시한다.
+3. `api-spec.md` 8절의 Kiln 설정을 서버에만 주입한다. 발급받은 키로 `GET /models`에서 `qwen3-32b` 사용 가능 여부를 확인한 뒤 `POST /chat/completions`로 평가·협상한다. 응답의 `usage.prompt_tokens`·`usage.completion_tokens`, `X-Neocloud-Generation-Id` 헤더, 지연 시간, 호출 단계와 결과 반영 내용을 저장한다. API가 사용량을 제공하지 않으면 추정값으로 표시한다. 평가 결과는 `ListingAssessment`로 저장한다. 공개 `Offer.rationale`은 공개 매물·유효 제안·평가 정보만으로 생성하고, 비공개 한계값을 본 에이전트의 원문 설명을 그대로 반환하지 않는다.
 4. 판매자별 `초기 제안 + 최대 2회 반대 제안`을 관리한다. 매 제안을 저장하고 다음 상대에게 넘기기 전에 정책 엔진을 실행한다.
 5. `총액=상품가+배송비+명시 수수료 <= 구매자 최고예산`, `상품가 >= 판매자 최저가`, 모델·재고·기한·필수 조건·만료를 결정적으로 검사한다. 차단 사유를 로그에 남긴다.
 6. 유효한 한 제안으로 불변 합의 스냅샷을 만들고 해시를 계산한다. 조건 변경 시 새 합의 ID/nonce와 새 승인을 요구한다.
@@ -49,9 +49,9 @@ print(resp.choices[0].message.content)
 
 ## 역할 간 계약
 
-- `api-spec.md`의 HTTP 엔드포인트를 구현하고 생성한 OpenAPI·예시 요청/응답이 명세와 일치하도록 유지해 프론트에 인계한다.
-- 데이터 담당에게 `save/get BuyerIntent`, `save/query Listing`, `save Offer/Agreement/AuditEvent/ModelUsage` 저장소를 요청한다. 상태 변경은 DB 트랜잭션으로 처리한다.
-- 블록체인 담당의 `prepare_approval`, `verify_signature`, `record_agreement`, `get_record` 인터페이스를 사용한다. live 모드에서 mock으로 자동 대체하지 않는다.
+- `api-spec.md`의 HTTP 엔드포인트를 구현하고 FastAPI `/openapi.json`·예시 요청/응답이 명세와 일치하도록 유지해 프론트에 인계한다. 개발 서버 기본 포트는 `8000`이다.
+- 데이터 담당의 `data/`에서 `save/get BuyerIntent`, `save/query Listing`, `save ListingAssessment/Offer/Agreement/AuditEvent/ModelUsage` 저장소를 호출한다. 상태 변경은 DB 트랜잭션으로 처리한다.
+- 블록체인 담당의 `blockchain/`에서 `prepare_approval`, `verify_signature`, `record_agreement`, `get_record` 인터페이스를 호출한다. live 모드에서 mock으로 자동 대체하지 않는다. 배포 후 `CONTRACT_ADDRESS`를 설정하고 Base Sepolia chain ID를 확인한다.
 - 오류 코드는 `BUDGET_EXCEEDED`, `SELLER_FLOOR_VIOLATED`, `DEADLINE_MISSED`, `OUT_OF_STOCK`, `OFFER_EXPIRED`, `SIGNATURE_INVALID`, `CHAIN_FAILED`를 포함한다.
 
 ## 테스트·완료 기준

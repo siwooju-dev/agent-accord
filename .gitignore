@@ -1,3 +1,12 @@
 .env
 .env.*
 !.env.example
+.venv/
+__pycache__/
+.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+data/*.db
+data/*.sqlite3
+contracts/out/
+contracts/cache/
