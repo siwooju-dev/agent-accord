@@ -7,7 +7,7 @@
 - Base path: `/api`. 요청·응답은 JSON UTF-8. 금액은 **정수 KRW**; 금액 계산은 서버가 다시 한다. 시간은 UTC ISO 8601(`2026-10-04T12:00:00Z`), EIP-712 `deadline`만 Unix 초다.
 - ID는 서버가 만든 문자열이다. 요청에 소유자 ID를 넣어도 신뢰하지 않고 세션에서 결정한다. 구매자 최고예산·판매자 최저가는 상대 사용자/에이전트에게 반환하지 않는다.
 - MVP 인증은 **가상 계정용 데모 세션**이다. `Authorization: Bearer <demo_token>`을 쓴다. `POST /api/demo/sessions`는 통제된 데모 환경에서만 켠다. 실제 사용자 인증이나 운영 환경의 보안을 주장하지 않는다.
-- `snapshot_hash`와 증빙 해시는 각각 SHA-256 32바이트를 `0x` + 64자리 16진수로 표시한다. 합의 스냅샷은 [RFC 8785 JCS](https://www.rfc-editor.org/rfc/rfc8785.html)로 정규화한 UTF-8 바이트를 해시한다. 스냅샷 필드와 타입은 아래 4절에서 고정한다.
+- `snapshot_hash`와 증빙 해시는 각각 SHA-256 32바이트를 `0x` + 64자리 **소문자** 16진수로 표시한다. 합의 스냅샷은 [RFC 8785 JCS](https://www.rfc-editor.org/rfc/rfc8785.html)로 정규화한 UTF-8 바이트를 해시한다. 스냅샷 필드와 타입은 아래 4절, 계약 ABI·nonce 규칙과 테스트 벡터는 `blockchain.md`에 고정한다.
 - 체인은 Base Sepolia(chain ID `84532`)로 정한다. 계약 주소는 배포 후 환경 설정으로 넣는다. Kiln의 공개 API 경로와 모델 ID는 8절을 따른다. 아래 예시는 구조 설명용 가상 데이터이며 실제 요청 ID, 서명 또는 트랜잭션이 아니다.
 - 성공 응답에는 `request_id`를 포함한다. 오류 형식은 7절을 따른다. 변경된 구매 조건은 기존 의도를 수정하지 않고 **새 `BuyerIntent`를 등록**해 별도 `flow_id`로 실행한다.
 
@@ -141,7 +141,7 @@ MVP 수수료는 `0 KRW`다. 따라서 `total_krw = item_price_krw + shipping_fe
 | --- | --- |
 | 승인 대기 | `mode: null`, `tx_hash: null`, `receipt_status: null` |
 | 제출/확정 대기 | `mode: testnet`, `chain_id`, `tx_hash`, `receipt_status: pending` |
-| 확정 성공 | 위 필드와 `receipt_status: success`, `block_number`, `event_name: AgreementRecorded`, `recorded_hash` |
+| 확정 성공 | 위 필드와 `receipt_status: success`, `block_number`, `event_name: AgreementRecorded`, `recorded_hash`; 이벤트와 `getAgreement`의 해시·당사자·총액·nonce 일치 |
 | 실패 | `receipt_status: failed`, `reason_code: CHAIN_FAILED`; `RECORDED`로 표시 금지 |
 
 mock 체인을 쓴 로컬 테스트라면 `mode=mock`, `tx_hash=null`로 표시한다. 실제 영수증·이벤트·계약 조회값이 합의 해시와 일치한 후에만 상태를 `RECORDED`로 바꾼다.
@@ -150,7 +150,7 @@ mock 체인을 쓴 로컬 테스트라면 `mode=mock`, `tx_hash=null`로 표시�
 
 해당 구매자/선택 판매자만 호출한다. `AWAITING_APPROVALS`이고 만료 전일 때만 반환한다. 응답은 `snapshot`, `snapshot_hash`, `typed_data`, `expected_wallet`을 포함한다. 프론트는 표시한 `snapshot`과 지갑이 서명할 `typed_data`를 함께 확인한다.
 
-`snapshot`의 고정 필드: `snapshot_version=1`, `agreement_id`, `offer_id`, `listing_id`, `seller_id`, `gpu_model`, `item_price_krw`, `shipping_fee_krw`, `total_krw`, `delivery_by`, `warranty_terms`, `evidence_hashes`, `buyer_wallet`, `seller_wallet`, `expires_at`, `nonce`. 필드 추가·타입 변경은 스냅샷 버전 변경과 양측 재승인이 필요하다. 구매자 최고예산과 판매자 최저가는 넣지 않는다.
+`snapshot`의 고정 필드: `snapshot_version=1`, `agreement_id`, `offer_id`, `listing_id`, `seller_id`, `gpu_model`, `item_price_krw`, `shipping_fee_krw`, `total_krw`, `delivery_by`, `warranty_terms`, `evidence_hashes`, `buyer_wallet`, `seller_wallet`, `expires_at`, `nonce`. `evidence_hashes`는 소문자 16진수로 통일해 중복 없이 오름차순, 지갑 주소도 스냅샷에는 소문자 `0x` + 40자리 16진수로 저장한다. 두 시각은 UTC 초 정밀도 `YYYY-MM-DDTHH:MM:SSZ`, 금액과 nonce는 JSON 안전 정수다. nonce는 구매자 주소별로 새 합의마다 유일한 **양의 정수**다. 필드 추가·타입 변경은 스냅샷 버전 변경과 양측 재승인이 필요하다. 구매자 최고예산과 판매자 최저가는 넣지 않는다.
 
 EVM에서 `typed_data`는 [EIP-712](https://eips.ethereum.org/EIPS/eip-712) 형식이다. `domain`은 `name=AgentAccord`, `version=1`, 설정된 `chainId`, `verifyingContract`를 포함한다. `primaryType=AgreementApproval`의 필드는 아래 순서다.
 
@@ -164,6 +164,8 @@ EVM에서 `typed_data`는 [EIP-712](https://eips.ethereum.org/EIPS/eip-712) 형�
 | `deadline` | `uint256` | `snapshot.expires_at`의 Unix 초 |
 
 `typed_data`는 `domain`, `types.EIP712Domain`(도메인 네 필드), `types.AgreementApproval`(위 필드명·타입의 순서 있는 배열), `primaryType`, `message`를 반환한다. 프론트는 이 객체를 바꾸지 않고 지갑에 전달한다. MVP는 EOA 테스트 지갑을 사용한다. 체인/계약 주소가 미설정이면 서명 자료를 임의로 만들지 않고 `CHAIN_CONFIG_UNAVAILABLE`을 반환한다. 블록체인 담당은 계약의 타입 해시와 이 표가 일치하는 골든 벡터를 제공한다. `totalKrw`는 합의 금액을 나타내는 기록값이며 토큰 결제 금액이 아니다.
+
+EIP-712 타입 문자열은 `AgreementApproval(bytes32 agreementHash,address buyer,address seller,uint256 totalKrw,uint256 nonce,uint256 deadline)`로 고정한다. 계약의 `recordAgreement` 인자·이벤트·조회 형식은 `blockchain.md`를 따른다. `agreementHash`는 JCS/SHA-256 스냅샷 해시이며 EIP-712 서명 digest와 다르다. 백엔드는 서명 전 두 값의 연결과 도메인의 실제 체인·계약 주소를 확인한다.
 
 ### 4.9 `POST /api/agreements/{id}/decisions`
 
@@ -228,8 +230,8 @@ EVM에서 `typed_data`는 [EIP-712](https://eips.ethereum.org/EIPS/eip-712) 형�
 | --- | --- |
 | `prepare_approval(agreement)` | 고정 스냅샷 해시와 EIP-712 typed data 생성 |
 | `verify_signature(payload, signature, expected_wallet)` | 서명 주소·chain ID·계약·해시·만료 확인 |
-| `record_agreement(agreement, signatures)` | 양측 서명 확인 후 tx 제출; 합의당 중복 기록 방지 |
-| `get_record(tx_hash)` | 영수증·이벤트·계약 상태 대조 |
+| `record_agreement(agreement, signatures)` | 양측 서명 확인 후 tx 제출; `submitted`+tx hash 또는 `already_recorded`+기존 기록; 합의당 중복 기록 방지 |
+| `get_record(tx_hash, agreement_hash)` | `pending/success/failed/not_found`, 영수증·이벤트·계약 상태 대조 |
 
 Kiln 공개 설정값은 `KILN_BASE_URL=https://api.bricksum.com/v1`, `KILN_MODEL_ID=qwen3-32b`다. 백엔드는 `KILN_API_KEY`를 서버 환경 변수에서 읽고 `Authorization: Bearer <KILN_API_KEY>`로 인증한다. 이 키는 프론트엔드로 보내지 않는다. 발급받은 키로 `GET {KILN_BASE_URL}/models`를 호출해 `data[].id`에 `qwen3-32b`가 있는지 확인한다. 없으면 모델 호출을 중단하고 설정 오류를 보고한다. 이 확인을 통과한 뒤 `POST {KILN_BASE_URL}/chat/completions`에 `model`, 역할별 `messages`, `max_tokens`를 보내며, 응답의 `choices[0].message.content`를 검증해 사용한다.
 

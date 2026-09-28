@@ -82,7 +82,7 @@ MVP 배포 대상은 **Base Sepolia**다. chain ID `84532`, 기본 공개 RPC `h
 | `AuditEvent` | `id`, `flow_id`, `at`, `actor`, `event_type`, `object_id`, `decision`, `reason_code` | 조건 검사·차단·승인·체인 결과를 순서대로 재구성 |
 | `ModelUsage` | `flow_id`, `actor`, `step`, `model_id`, `request_id`, `input_tokens`, `output_tokens`, `latency_ms`, `source` | `source`로 API 실측과 추정 구분 |
 
-`Agreement.snapshot`에는 스냅샷 버전, 합의 ID, 매물 ID·공개 상품 정보, 상품가/배송비/총액, 배송 기한, 보증, 참조 증빙 해시, 양측 지갑 주소, 만료 시각, nonce를 포함한다. 비공개 최고예산/최저가는 포함하지 않는다. 스냅샷 변경은 새 해시와 새 양측 승인을 요구한다.
+`Agreement.snapshot`에는 스냅샷 버전, 합의 ID, 매물 ID·공개 상품 정보, 상품가/배송비/총액, 배송 기한, 보증, 참조 증빙 해시, 양측 지갑 주소, 만료 시각, nonce를 포함한다. 비공개 최고예산/최저가는 포함하지 않는다. 증빙 해시 순서·시각·nonce 형식과 계약 함수·이벤트는 `api-spec.md` 4.8절 및 `blockchain.md`의 v1 규격을 따른다. 스냅샷 변경은 새 해시와 새 양측 승인을 요구한다.
 
 ## 전체 워크플로우
 

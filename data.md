@@ -14,6 +14,7 @@
 4. 구매자 최고예산과 판매자 최저가는 소유자/서버 전용으로 저장한다. 상대 에이전트용 조회 결과와 공개 API 응답에는 넣지 않는다.
 5. 판매자 설명과 증빙의 원문·출처·확인 상태를 저장한다. 확인 상태는 `seller_claimed`, `checked`, `conflicted`, `unknown`을 사용하고, AI가 읽었다는 이유만으로 `checked`로 바꾸지 않는다. 흐름별 `ListingAssessment`의 `summary`, `findings`, `source`와 `Offer.rationale`도 보존한다. finding의 `consistent`는 증빙의 `checked`와 다르다.
 6. 합의 스냅샷·해시, 양측 승인, tx hash, 서버 차단 이유, 단계별 Kiln 토큰 사용량을 `flow_id`로 연결해 저장한다. 합의 해시 계산·서명 검증은 백엔드/블록체인 담당이 맡는다.
+7. 합의의 `(buyer_wallet, nonce)`와 `snapshot_hash`에 각각 유일성 제약을 둔다. 새 합의는 해당 구매자의 미사용 양의 nonce를 사용한다. 계약도 동일한 재사용 방지 규칙을 검사한다.
 
 ## 시연 데이터
 
