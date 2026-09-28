@@ -1,6 +1,6 @@
 # 프로젝트: 중고 GPU 구매·판매 에이전트 협상
 
-> 상태: 설계 문서. 여기 적힌 API·계약·화면은 구현 목표이며 현재 동작한다는 뜻이 아니다. 모든 개발 에이전트는 이 문서와 자기 역할 문서를 먼저 읽는다.
+> 상태: 설계 문서. 여기 적힌 API·계약·화면은 구현 목표이며 현재 동작한다는 뜻이 아니다. 모든 개발 에이전트는 이 문서, `api-spec.md`, 자기 역할 문서를 읽는다.
 
 ## 한 문장 정의
 
@@ -58,7 +58,7 @@ flowchart LR
 | 객체 | 핵심 필드 | 공개 범위·규칙 |
 | --- | --- | --- |
 | `BuyerIntent` | `id`, `buyer_id`, `gpu_model`, `max_total_krw`, `delivery_deadline`, `must_have` | 최고 총예산은 구매자와 서버만 열람 |
-| `SellerPolicy` | `seller_id`, `listing_id`, `min_item_price_krw`, `earliest_ship_date` | 최저가는 해당 판매자와 서버만 열람 |
+| `SellerPolicy` | `seller_id`, `listing_id`, `min_item_price_krw`, `earliest_delivery_at` | 최저가는 해당 판매자와 서버만 열람 |
 | `Listing` | `id`, `seller_id`, `gpu_model`, `asking_price_krw`, `shipping_fee_krw`, `condition_text`, `warranty_end`, `stock_status`, `evidence_ids` | 공개 매물; 원문과 수정 이력 유지 |
 | `Evidence` | `id`, `listing_id`, `kind`, `source`, `ref`, `sha256`, `verification_status` | 상태는 `seller_claimed/checked/conflicted/unknown`; AI 열람만으로 `checked`가 되지 않음 |
 | `Offer` | `id`, `negotiation_id`, `listing_id`, `round`, `proposer`, `item_price_krw`, `shipping_fee_krw`, `total_krw`, `delivery_by`, `warranty_terms`, `expires_at`, `evidence_ids` | 모델 출력은 초안; 서버 검증 통과 후 노출 |
@@ -66,7 +66,7 @@ flowchart LR
 | `AuditEvent` | `id`, `flow_id`, `at`, `actor`, `event_type`, `object_id`, `decision`, `reason_code` | 조건 검사·차단·승인·체인 결과를 순서대로 재구성 |
 | `ModelUsage` | `flow_id`, `actor`, `step`, `model_id`, `request_id`, `input_tokens`, `output_tokens`, `latency_ms`, `source` | `source`로 API 실측과 추정 구분 |
 
-`Agreement.snapshot`에는 합의 ID, 매물 ID·공개 상품 정보, 상품가/배송비/총액, 배송 기한, 보증, 참조 증빙 해시, 양측 지갑 주소, 만료 시각, nonce를 포함한다. 비공개 최고예산/최저가는 포함하지 않는다. 스냅샷 변경은 새 해시와 새 양측 승인을 요구한다.
+`Agreement.snapshot`에는 스냅샷 버전, 합의 ID, 매물 ID·공개 상품 정보, 상품가/배송비/총액, 배송 기한, 보증, 참조 증빙 해시, 양측 지갑 주소, 만료 시각, nonce를 포함한다. 비공개 최고예산/최저가는 포함하지 않는다. 스냅샷 변경은 새 해시와 새 양측 승인을 요구한다.
 
 ## 전체 워크플로우
 
@@ -87,17 +87,21 @@ flowchart LR
 
 이 설계가 증명하는 것은 **두 주소가 같은 합의 해시에 서명했고 그 기록이 체인에 포함됐다는 사실**이다. 서버가 모든 제안을 보는 MVP는 입찰 비밀성이나 경매 공정성을 암호학적으로 증명한다고 주장하지 않는다. 커밋-공개 방식은 후속 범위다.
 
-## API·어댑터 초안
+## API·어댑터 요약
+
+HTTP 요청·응답, 권한, 오류, 승인 서명 형식의 상세 계약은 `api-spec.md`를 따른다. 아래 표는 흐름을 읽기 위한 요약이다.
 
 | 기능 | 경로/함수 | 반환 |
 | --- | --- | --- |
+| 데모 사용자 선택 | `POST /api/demo/sessions` | 가상 계정 세션 |
 | 구매 조건/매물 등록 | `POST /api/buyer-intents`, `POST /api/listings` | 생성 ID |
 | 협상 시작/조회 | `POST /api/negotiations`, `GET /api/negotiations/{id}` | 상태, 유효 제안, 근거·차단 이유 |
+| 내 합의 목록 | `GET /api/agreements` | 승인 대기·완료 합의 |
 | 승인 자료/결정 | `GET /api/agreements/{id}/approval-payload`, `POST /api/agreements/{id}/decisions` | 동일 스냅샷·서명 데이터, 승인/거절 상태 |
 | 합의/감사 조회 | `GET /api/agreements/{id}`, `GET /api/flows/{id}/audit` | 양측 승인, tx hash/영수증, 사건·토큰 내역 |
 | 체인 어댑터 | `prepare_approval`, `verify_signature`, `record_agreement`, `get_record` | typed data, 검증 결과, tx/체인 기록 |
 
-백엔드 담당이 위 초안을 OpenAPI로 구체화한다. mock과 실제 Kiln/체인은 같은 결과 타입을 써도 화면·로그에서 구분한다. mock tx를 실제 온체인 기록으로 표시하지 않는다.
+백엔드 담당이 `api-spec.md`를 구현하고 OpenAPI와 일치시킨다. mock과 실제 Kiln/체인은 같은 결과 타입을 써도 화면·로그에서 구분한다. mock tx를 실제 온체인 기록으로 표시하지 않는다.
 
 ## 데모·완료 기준
 

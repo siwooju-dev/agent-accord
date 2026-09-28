@@ -1,6 +1,6 @@
 # 백엔드·AI 에이전트 담당 개발 명세
 
-> 개발 에이전트는 `project.md`의 데이터 계약·상태·워크플로우를 먼저 읽는다. 소유 영역은 `backend/`의 API·서비스·Kiln 연결이다.
+> 개발 에이전트는 `project.md`, `api-spec.md`, 이 문서를 읽는다. 소유 영역은 `backend/`의 API·서비스·Kiln 연결이다.
 
 ## 목표
 
@@ -29,7 +29,7 @@
 
 ## 역할 간 계약
 
-- `project.md`의 API를 OpenAPI와 예시 요청/응답으로 구체화해 프론트에 인계한다.
+- `api-spec.md`의 HTTP 엔드포인트를 구현하고 생성한 OpenAPI·예시 요청/응답이 명세와 일치하도록 유지해 프론트에 인계한다.
 - 데이터 담당에게 `save/get BuyerIntent`, `save/query Listing`, `save Offer/Agreement/AuditEvent/ModelUsage` 저장소를 요청한다. 상태 변경은 DB 트랜잭션으로 처리한다.
 - 블록체인 담당의 `prepare_approval`, `verify_signature`, `record_agreement`, `get_record` 인터페이스를 사용한다. live 모드에서 mock으로 자동 대체하지 않는다.
 - 오류 코드는 `BUDGET_EXCEEDED`, `SELLER_FLOOR_VIOLATED`, `DEADLINE_MISSED`, `OUT_OF_STOCK`, `OFFER_EXPIRED`, `SIGNATURE_INVALID`, `CHAIN_FAILED`를 포함한다.
