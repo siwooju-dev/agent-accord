@@ -16,6 +16,26 @@
 
 같은 모델을 사용해도 역할별 프롬프트/대화 문맥은 분리한다. 매물 설명은 신뢰하지 않는 입력으로 취급한다. 현재 Kiln의 `qwen3-32b`는 구조화 출력과 강제 도구 호출을 보장하지 않으므로, JSON만 반환하도록 요청한 뒤 서버에서 파싱·스키마 검증한다. 유효하지 않은 응답은 제안으로 사용하지 않는다. 오류 재시도는 최대 1회로 제한하고 실패를 가짜 성공으로 바꾸지 않는다.
 
+## Kiln 연결 예시
+
+팀이 전달받은 OpenAI 호환 호출 예시다. `KILN_API_KEY`의 실제 값은 서버 환경 변수에만 둔다. 이 예시는 연결 확인용이며, 서비스에서는 역할별 메시지와 출력 검증·사용량 기록을 추가한다.
+
+```python
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    base_url=os.environ.get("KILN_BASE_URL", "https://api.bricksum.com/v1"),
+    api_key=os.environ["KILN_API_KEY"],
+)
+
+resp = client.chat.completions.create(
+    model=os.environ.get("KILN_MODEL_ID", "qwen3-32b"),
+    messages=[{"role": "user", "content": "Hello!"}],
+)
+print(resp.choices[0].message.content)
+```
+
 ## 필수 서비스
 
 1. 구매자/판매자의 자기 데이터 접근 권한과 입력 형식을 검사한다.

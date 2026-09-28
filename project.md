@@ -26,7 +26,7 @@
 | 블록체인 | devnet/testnet 실제 트랜잭션 1건 이상, tx hash, 성공 영수증, 대응 이벤트/조회 기록 |
 | 조건 검증 | 기본 실행 뒤 사용자 조건을 바꾼 실행 2회, 차단/성공을 재구성할 수 있는 로그 |
 
-제공된 PDF에는 과거 모델명 `gpt-oss-120b`가 적혀 있고 팀이 전달받은 최신 기준은 `Qwen3-32B`다. [Kiln 공식 모델 문서](https://kiln.bricksum.com/docs/en/models)의 모델 ID는 `qwen3-32b`이며, 실제 사용 가능 여부는 발급받은 키로 `GET /models`를 호출해 확인한다. Kiln 연결 규칙은 `api-spec.md` 8절을 따른다. 허용 체인은 운영진 최신 안내로 확정하고 변경 근거를 제출물에 남긴다. 모델 이름만 표시하는 모의 호출은 실제 Kiln 통합으로 간주하지 않는다.
+제공된 PDF에는 과거 모델명 `gpt-oss-120b`가 적혀 있고 팀이 전달받은 최신 기준은 `Qwen3-32B`다. [Kiln 공식 모델 문서](https://kiln.bricksum.com/docs/en/models)의 모델 ID는 `qwen3-32b`이며, 팀은 발급받은 키로 이 모델에 접근 가능하다는 안내를 받았다. 백엔드 연결 시 `GET /models` 확인과 실제 `POST /chat/completions` 호출 결과를 기록한다. Kiln 연결 규칙은 `api-spec.md` 8절을 따른다. 허용 체인은 운영진 최신 안내로 확정하고 변경 근거를 제출물에 남긴다. 모델 이름만 표시하는 모의 호출은 실제 Kiln 통합으로 간주하지 않는다.
 
 ## 구성
 
