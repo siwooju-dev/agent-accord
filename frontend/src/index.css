@@ -1,0 +1,39 @@
+:root {
+  font-family: Inter, "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+  color: #202a2b;
+  background: #f6f7f4;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-size: 14px;
+  font-feature-settings: "ss01" on;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+a {
+  color: inherit;
+}
+::selection {
+  background: #bce8d8;
+  color: #18322d;
+}
