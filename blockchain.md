@@ -14,7 +14,7 @@
 
 ## 승인 메시지·계약
 
-EVM MVP는 EIP-712 typed data를 사용한다. 도메인: `name`, `version`, `chainId`, `verifyingContract`. 메시지: `agreementHash`, `buyer`, `seller`, `totalKrw`, `nonce`, `deadline`. 양측은 정확히 같은 메시지에 각자 지갑으로 서명한다. `agreementHash`는 데이터 담당의 불변 스냅샷 해시와 같다.
+EVM MVP는 EIP-712 typed data를 사용한다. 도메인: `name`, `version`, `chainId`, `verifyingContract`. 메시지: `agreementHash`, `buyer`, `seller`, `totalKrw`, `nonce`, `deadline`. 양측은 정확히 같은 메시지에 각자 지갑으로 서명한다. `agreementHash`는 백엔드가 만든 불변 합의 스냅샷 해시와 같다.
 
 계약의 `recordAgreement`는 다음을 검사한다.
 
