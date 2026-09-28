@@ -340,6 +340,7 @@ function App() {
             워크스페이스 <span>/</span> <b>{title}</b>
           </div>
           <div className="top-actions">
+            <a className="live-mode-link" href="?mode=live">실제 API 연결</a>
             <span className="environment">
               <i className="status-dot amber" /> DEMO / MOCK
             </span>
