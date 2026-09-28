@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Address, Hex } from "viem";
-import { approvalBlockReason, walletTypedData } from "./approval";
-import type { Agreement, ApprovalPayload, DemoSession } from "./types";
+import { approvalBlockReason, hashSnapshot, snapshotHashMatches, walletTypedData } from "./approval";
+import type { Agreement, AgreementSnapshot, ApprovalPayload, DemoSession } from "./types";
 
 const buyer = `0x${"1".repeat(40)}` as Address;
 const seller = `0x${"2".repeat(40)}` as Address;
@@ -18,7 +18,7 @@ function fixture() {
     item_price_krw: 450000, shipping_fee_krw: 10000, total_krw: 460000,
     delivery_by: "2030-01-02T12:00:00Z", warranty_terms: "보증서 기준",
     evidence_hashes: [evidenceHash], buyer_wallet: buyer, seller_wallet: seller,
-    expires_at: expiry, nonce: "7",
+    expires_at: expiry, nonce: 7,
   };
   const agreement: Agreement = {
     request_id: "req-1", id: "agreement-1", flow_id: "flow-1", offer_id: "offer-1",
@@ -52,6 +52,32 @@ function fixture() {
   };
   return { agreement, payload, session, wallet: { address: buyer, chainId: 84532 } };
 }
+
+
+it("matches the blockchain RFC 8785 / SHA-256 golden vector", async () => {
+  const snapshot: AgreementSnapshot = {
+    snapshot_version: 1,
+    agreement_id: "agreement-vector-1",
+    offer_id: "offer-vector-1",
+    listing_id: "listing-vector-1",
+    seller_id: "seller-vector-1",
+    gpu_model: "RTX 3070",
+    item_price_krw: 450000,
+    shipping_fee_krw: 10000,
+    total_krw: 460000,
+    delivery_by: "2030-01-03T12:00:00Z",
+    warranty_terms: "seller warranty until 2031-01-31",
+    evidence_hashes: [`0x${"1".repeat(64)}` as Hex],
+    buyer_wallet: `0x${"1".repeat(40)}` as Address,
+    seller_wallet: `0x${"2".repeat(40)}` as Address,
+    expires_at: "2030-01-01T12:00:00Z",
+    nonce: 1,
+  };
+  const expected = "0x10c8bc9492fea93859ecb238acd53f1b86c4c34895187be9116f35811e5556cc";
+  await expect(hashSnapshot(snapshot)).resolves.toBe(expected);
+  await expect(snapshotHashMatches(snapshot, expected)).resolves.toBe(true);
+  await expect(snapshotHashMatches({ ...snapshot, total_krw: 470000 }, expected)).resolves.toBe(false);
+});
 
 describe("approvalBlockReason", () => {
   it("allows only a matching unexpired snapshot, typed data, account, and chain", () => {

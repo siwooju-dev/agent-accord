@@ -130,7 +130,7 @@ export interface AgreementSnapshot {
   buyer_wallet: Address;
   seller_wallet: Address;
   expires_at: string;
-  nonce: number | string;
+  nonce: number;
 }
 
 export interface ChainResult {

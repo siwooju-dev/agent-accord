@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError, api } from "./api";
-import { approvalBlockReason, sameSnapshot } from "./approval";
+import { approvalBlockReason, sameSnapshot, snapshotHashMatches } from "./approval";
 import {
   AgreementList, AgreementPanel, AuditPanel, BuyerForm, NegotiationPanel, SellerForm,
 } from "./LivePanels";
@@ -218,13 +218,21 @@ export default function LiveApp() {
     if (!session || !agreement || !payload || !confirmed) return;
     const initialReason = approvalBlockReason(agreement, payload, session, wallet);
     if (initialReason) throw new Error(initialReason);
+    if (agreement.snapshot_hash !== payload.snapshot_hash ||
+        !(await snapshotHashMatches(payload.snapshot, payload.snapshot_hash))) {
+      setConfirmed(false);
+      throw new Error("합의 스냅샷의 SHA-256 해시가 일치하지 않습니다. 다시 조회하세요.");
+    }
     const latest = await api.getAgreement(session.access_token, agreement.id);
     const freshPayload = await api.getApprovalPayload(session.access_token, agreement.id);
     setAgreement(latest); setPayload(freshPayload);
     if (latest.snapshot_hash !== agreement.snapshot_hash ||
-        !sameSnapshot(latest.snapshot, agreement.snapshot)) {
+        !sameSnapshot(latest.snapshot, agreement.snapshot) ||
+        latest.snapshot_hash !== freshPayload.snapshot_hash ||
+        !(await snapshotHashMatches(latest.snapshot, latest.snapshot_hash)) ||
+        !(await snapshotHashMatches(freshPayload.snapshot, freshPayload.snapshot_hash))) {
       setConfirmed(false);
-      throw new Error("서명 직전에 합의 내용이 바뀌었습니다. 다시 확인하세요.");
+      throw new Error("서명 직전에 합의 내용이나 해시가 바뀌었습니다. 다시 확인하세요.");
     }
     const activeWallet = await currentWallet();
     setWallet(activeWallet);

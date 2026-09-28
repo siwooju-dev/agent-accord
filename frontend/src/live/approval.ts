@@ -1,8 +1,8 @@
-import { isAddress } from "viem";
+import { isAddress, type Hex } from "viem";
 import type { Agreement, ApprovalPayload, AgreementSnapshot, DemoSession } from "./types";
 
 const CHAIN_ID = 84532;
-const HASH = /^0x[0-9a-fA-F]{64}$/;
+const HASH = /^0x[0-9a-f]{64}$/;
 const SNAPSHOT_FIELDS = [
   "snapshot_version", "agreement_id", "offer_id", "listing_id", "seller_id",
   "gpu_model", "item_price_krw", "shipping_fee_krw", "total_krw",
@@ -40,16 +40,87 @@ function sameFields(actual: Array<{ name: string; type: string }> | undefined, e
 export function sameSnapshot(a: AgreementSnapshot, b: AgreementSnapshot): boolean {
   const keys = Object.keys(a).sort().join("|");
   const expectedKeys = [...SNAPSHOT_FIELDS].sort().join("|");
-  if (keys !== expectedKeys || Object.keys(b).sort().join("|") !== expectedKeys) return false;
+  const validEvidenceHashes = (hashes: unknown): hashes is string[] =>
+    Array.isArray(hashes) && hashes.every((hash, index) =>
+      typeof hash === "string" && HASH.test(hash) &&
+      (index === 0 || hashes[index - 1] < hash));
+
+  if (keys !== expectedKeys || Object.keys(b).sort().join("|") !== expectedKeys ||
+      !validEvidenceHashes(a.evidence_hashes) || !validEvidenceHashes(b.evidence_hashes) ||
+      !isAddress(a.buyer_wallet) || a.buyer_wallet !== a.buyer_wallet.toLowerCase() ||
+      !isAddress(a.seller_wallet) || a.seller_wallet !== a.seller_wallet.toLowerCase() ||
+      !isAddress(b.buyer_wallet) || b.buyer_wallet !== b.buyer_wallet.toLowerCase() ||
+      !isAddress(b.seller_wallet) || b.seller_wallet !== b.seller_wallet.toLowerCase()) return false;
+
   return SNAPSHOT_FIELDS.every((field) => {
     if (field === "evidence_hashes") {
-      return Array.isArray(a.evidence_hashes) && Array.isArray(b.evidence_hashes) &&
-        a.evidence_hashes.length === b.evidence_hashes.length &&
-        a.evidence_hashes.every((hash, index) => hash === b.evidence_hashes[index] && HASH.test(hash));
+      return a.evidence_hashes.length === b.evidence_hashes.length &&
+        a.evidence_hashes.every((hash, index) => hash === b.evidence_hashes[index]);
     }
-    if (field === "nonce") return integer(a.nonce) !== null && integer(a.nonce) === integer(b.nonce);
+    if (field === "nonce") {
+      return Number.isSafeInteger(a.nonce) && a.nonce > 0 &&
+        Number.isSafeInteger(b.nonce) && b.nonce === a.nonce;
+    }
     return a[field] === b[field];
   });
+}
+
+function isUtcSecond(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)) return false;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) &&
+    new Date(parsed).toISOString().replace(".000Z", "Z") === value;
+}
+
+function isCanonicalSnapshot(snapshot: AgreementSnapshot): boolean {
+  const textFields = [
+    snapshot.agreement_id, snapshot.offer_id, snapshot.listing_id, snapshot.seller_id,
+    snapshot.gpu_model, snapshot.delivery_by, snapshot.warranty_terms, snapshot.expires_at,
+  ];
+  return sameSnapshot(snapshot, snapshot) &&
+    snapshot.snapshot_version === 1 &&
+    textFields.every((value) => typeof value === "string") &&
+    Number.isSafeInteger(snapshot.item_price_krw) && snapshot.item_price_krw > 0 &&
+    Number.isSafeInteger(snapshot.shipping_fee_krw) && snapshot.shipping_fee_krw >= 0 &&
+    Number.isSafeInteger(snapshot.total_krw) &&
+    snapshot.total_krw === snapshot.item_price_krw + snapshot.shipping_fee_krw &&
+    isUtcSecond(snapshot.delivery_by) && isUtcSecond(snapshot.expires_at);
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) throw new Error("스냅샷 숫자는 JSON 안전 정수여야 합니다.");
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(",")}]`;
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
+  }
+  throw new Error("스냅샷에 JSON으로 표현할 수 없는 값이 있습니다.");
+}
+
+export async function hashSnapshot(snapshot: AgreementSnapshot): Promise<Hex> {
+  if (!isCanonicalSnapshot(snapshot)) throw new Error("스냅샷 형식이 API/블록체인 계약과 다릅니다.");
+  const bytes = new TextEncoder().encode(canonicalJson(snapshot));
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `0x${hash}` as Hex;
+}
+
+export async function snapshotHashMatches(snapshot: AgreementSnapshot, expectedHash: string): Promise<boolean> {
+  if (!HASH.test(expectedHash)) return false;
+  try {
+    return await hashSnapshot(snapshot) === expectedHash;
+  } catch {
+    return false;
+  }
 }
 
 export function approvalBlockReason(
