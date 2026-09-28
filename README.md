@@ -22,3 +22,9 @@ Qwen3-32B / Kiln API로 구매 조건을 이해하고, Policy Engine으로 제�
 각 ROLE 문서의 ‘GPT에게 줄 시작 지시’를 복사해 사용한다. 역할 문서뿐 아니라 공통 문서와 현재 코드도 참조할 수 있게 한다. 파일 접근이 없는 채팅에서는 문서를 첨부하고 읽지 못한 파일을 읽었다고 가정하지 않도록 한다.
 
 모델명은 사용자 제공 변경사항에 따라 Qwen3-32B다. 운영진 API 연결 정보와 허용 테스트넷은 실제 연동 전에 확인한다.
+
+## Project Documents
+
+- [Team Plan](TEAM_PLAN.md)
+- [AI Agent Architecture](AGENT_ARCHITECTURE.md)
+- [Agent Demo Scenarios](AGENT_DEMO_SCENARIOS.md)
