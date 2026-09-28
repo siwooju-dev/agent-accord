@@ -194,6 +194,9 @@ def negotiate(app, deal_id, version):
                 negotiation = db.scalar(select(m.Negotiation).where(m.Negotiation.deal_id == deal.id, m.Negotiation.policy_version == version))
                 negotiation.status = "COMPLETE"
                 return
+            if number == policy.max_rounds:
+                block(db, deal, ["ROUND_LIMIT"])
+                return
             previous = proposal.model_dump(mode="json")
 
 

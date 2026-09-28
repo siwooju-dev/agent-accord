@@ -7,6 +7,8 @@
 - [Chat completions](https://kiln.bricksum.com/docs/en/api-reference/chat-completions): `response_format`을 지원하지 않는다. JSON-only 프롬프트 후 로컬 검증이 필요하다.
 - [Models](https://kiln.bricksum.com/docs/en/models): 실제 서비스 가능 ID는 인증 GET /models로 확인해야 한다. 문서의 이전 staging 예제와 현재 catalog 상태가 다를 수 있다.
 
+[GWDC 공식 Challenge 안내](https://wap.gwdc.net/hackathon.html)에서도 FuriosaAI × Bricksum의 Challenge A가 AI Agent·블록체인 금융 서비스임을 확인했다. 이 공개 요약은 팀별 지급 endpoint, Qwen 대체 승인, 허용 chain을 확정하는 증거가 아니다. 해당 운영진 증거는 별도로 필요하다.
+
 공식 안내의 base URL 예시는 `https://api.bricksum.com/v1`이다. 이는 운영진이 지급한 이 팀의 endpoint를 검증한 증거가 아니다. 코드에는 이 주소나 모델 ID를 기본값으로 넣지 않는다. 운영진의 `KILN_BASE_URL`(API prefix 포함), `KILN_API_KEY`, `KILN_MODEL`, `KILN_AUTH_MODE=bearer|x-api-key`를 환경 변수로 설정한다. redirect를 따라가지 않아 인증값이 다른 host로 전달되지 않는다.
 
 사용자 제공 요건의 PDF 모델은 gpt-oss-120b다. 이 checkout에서 첨부 PDF 원문은 발견되지 않았다. 기존 팀 문서의 Qwen3-32B 선호는 대체 승인 증거가 아니다. qwen3-32b가 /models에 있어도 공식 요건 충족을 주장하려면 운영진의 명시적 대체 허용 근거가 필요하다. 실제 제공 모델이 다르면 probe 결과와 승인 근거를 함께 보관한다.

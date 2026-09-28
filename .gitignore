@@ -18,3 +18,7 @@ test-results/
 playwright-report/
 .test-temp*/
 *.tsbuildinfo
+
+# Preserve ignores from integrated GPU design branch.
+contracts/out/
+contracts/cache/

@@ -2,7 +2,7 @@
 
 ## 실행 환경과 범위
 
-Windows PowerShell, Python 3.12 전용 `.venv`, Node.js 24.16.0. 실제 저장소는 상위 작업 폴더가 아닌 `policy-guard-ai-agent/`의 Git 저장소다. 개발 시작 시 최신 main을 fetch/fast-forward한 뒤 `codex/dealbattle`에서 구현했다. 시작 main은 설계 문서만 있었고 README/OpenAPI/docs/코드가 없었다. 이후 동료가 원격 main에 설계/환경 예시 변경을 추가했으므로 통합 시 그 변경을 먼저 반영한다. 모델/체인 실사용 설정은 없다.
+Windows PowerShell, Python 3.12 전용 `.venv`, Node.js 24.16.0. 실제 저장소는 상위 작업 폴더가 아닌 `policy-guard-ai-agent/`의 Git 저장소다. 개발 시작 시 최신 main을 fetch/fast-forward한 뒤 `codex/dealbattle`에서 구현했다. 시작 main은 설계 문서만 있었고 README/OpenAPI/docs/코드가 없었다. 이후 동료의 원격 main `ffa4d76`까지 통합했다. 최신 GPU/양측 서명/API v1 설계 원문은 docs/legacy에 그대로 보존하고 루트 문서는 사용자 지시의 실행 계약 v2로 연결했다. main의 팀 Base Sepolia 선택은 운영진 허용 증거로 자동 간주하지 않았다. 모델/체인 실사용 설정은 없다.
 
 ## 실제 실행 결과
 
@@ -12,7 +12,7 @@ Windows PowerShell, Python 3.12 전용 `.venv`, Node.js 24.16.0. 실제 저장�
 | `python scripts/manage.py migrate` | 0001 → 0002 적용 성공 |
 | `python scripts/manage.py seed` | simulated 노트북 4개 생성; 재시드 중복 없음 테스트 통과 |
 | `npm --prefix chain ci/install`, `npm --prefix chain run compile` | solc 0.8.28 컴파일 성공 |
-| `python -m pytest backend/tests -q --basetemp=.test-temp-final -p no:cacheprovider --tb=short` | **52 passed**, 2 upstream deprecation warnings |
+| `python -m pytest backend/tests -q --basetemp=.test-temp-round -p no:cacheprovider --tb=short` | **55 passed**, 2 upstream deprecation warnings |
 | `npm --prefix frontend run generate:api` | OpenAPI TypeScript 생성 성공 |
 | `npm --prefix frontend test` | **2 passed** |
 | `npm --prefix frontend run build` | tsc + Vite 6.4.3 build 성공 |
@@ -42,3 +42,5 @@ E2E는 실제 UI에서 A/B/C, 거절, policy 변경 후 재확정, 응답 유실
 ## 남은 외부 의존성
 
 운영진 지급 KILN_BASE_URL/API_KEY/MODEL, gpt-oss-120b 대체 시 명시 허용 증거, 팀 계정의 모델/요금/응답 확인, 허용 chain/RPC/ID/explorer 근거, 테스트 자산 relayer, 실제 배포/tx receipt가 필요하다. PostgreSQL 및 HTTPS live 배포/실제 IdP 통합은 미검증이다. 재실행 명령은 README와 docs/KILN_INTEGRATION.md에 있다. 실제 결제·송금·판매자 사람 지갑 서명·실물 인도는 구현했다고 주장하지 않는다.
+
+최대 라운드 2/6/12 경계 회귀 검증을 추가해 마지막 제안 이후에도 BLOCKED/ROUND_LIMIT으로 종료됨을 확인했다. 최종 백엔드 55개 테스트가 통과했다. `reports/mock-demo.json`은 scripts/demo.py의 실제 mock 실행 출력이며 키/세션/실제 tx를 포함하지 않는다. 패턴 기반 index 및 모든 fetch된 reachable Git history 스캔은 NO_MATCHES였다. 실제 비밀 유출이 없다는 완전한 보증은 아니며 비밀 파일 발견 시 별도 교체 대상이다.

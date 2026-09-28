@@ -106,3 +106,26 @@ def test_no_private_reason_or_instructions_in_opponent_context():
     messages = messages_for("seller", product, {"min_item_price_krw": 910000}, prior)
     assert "budget=1000000" not in json.dumps(messages)
     assert "ignore all safety" not in json.dumps(messages)
+
+
+@pytest.mark.parametrize('limit',[2,6,12])
+def test_round_limit_always_ends_without_an_extra_call(rig,limit):
+    from app.agent import MockAgent
+    from conftest import policy
+    app, client = rig
+    class CounterAgent(MockAgent):
+        calls = 0
+        def propose(self,*args):
+            proposal,usage=super().propose(*args)
+            self.calls += 1
+            proposal.action = 'OFFER' if self.calls == 1 else 'COUNTER'
+            proposal.item_price_krw = 940000
+            return proposal,usage
+    agent=CounterAgent()
+    app.state.agent=agent
+    data=policy()
+    data['max_rounds']=limit
+    base,deal=start(client,data)
+    assert deal['status']=='BLOCKED' and deal['reason_codes']==['ROUND_LIMIT']
+    assert agent.calls==limit and client.get(base+'/usage').json()['call_count']==limit
+    assert deal['agreement'] is None and deal['chain'] is None

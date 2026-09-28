@@ -1,31 +1,9 @@
-# 데이터 담당: 단기 MVP 작업 명세
+# Data / Integration / QA 구현 담당 — v2
 
-> 개발 에이전트는 `project.md`의 공통 데이터 계약을 먼저 읽는다. 이 문서는 시연에 필요한 데이터와 DB 작업만 다룬다.
+현재 모델은 backend/app/db.py와 schemas.py다. 기존 sqlite3/GPU 담당 문서는 docs/legacy/data.md에 보존했다. 이번 사용자 지시에 따라 SQLAlchemy+Alembic, SQLite 로컬 및 Postgres 전환 구조를 구현했다.
 
-## 목표
+테이블은 buyer policy/product/seller policy/proposal/round/agreement/approval/audit/usage/chain record/outbox/nonce/session/idempotency다. 금액은 정수 KRW, 시각은 UTC. 합의 snapshot은 API에서 수정하지 않는다. 공개 상품/Buyer Agent에 floor를 넣지 않고 seller 원본 이유는 서버 내부에만 보존한다.
 
-가상 중고 GPU 매물을 준비하고, 구매 조건부터 협상·양측 승인·온체인 결과까지 한 번의 실행을 다시 확인할 수 있게 저장한다. API와 거래 조건 판정은 백엔드 담당이 맡는다.
+마이그레이션: python scripts/manage.py migrate. 4개의 simulated 노트북 seed: python scripts/manage.py seed. 기존 시드/재고/날짜를 덮어쓰지 않는다. 새 데모 DB는 다른 DATABASE_URL로 migrate/seed한다. 정상·예산 차단·판매자 차단 데모: python scripts/demo.py.
 
-## 해야 할 일
-
-1. `project.md`의 `BuyerIntent`, `SellerPolicy`, `Listing`, `Evidence`, `Offer`, `Agreement`, `AuditEvent`, `ModelUsage`를 저장할 간단한 DB 스키마를 만든다. 단기 시연의 기본 DB는 SQLite로 한다.
-2. 빈 DB에 테이블을 만드는 초기화 명령과, 가상 데이터를 넣는 시드 명령을 만든다. 같은 시드를 다시 실행해도 중복 매물이 생기지 않게 한다.
-3. 백엔드가 사용할 **매물 검색·제안/합의 저장·실행 기록 조회** 함수를 제공한다. 모델·재고·배송 조건은 정확한 DB 필터로 검색한다.
-4. 구매자 최고예산과 판매자 최저가는 소유자/서버 전용으로 저장한다. 상대 에이전트용 조회 결과와 공개 API 응답에는 넣지 않는다.
-5. 판매자 설명과 증빙의 원문·출처·확인 상태를 저장한다. 확인 상태는 `seller_claimed`, `checked`, `conflicted`, `unknown`을 사용하고, AI가 읽었다는 이유만으로 `checked`로 바꾸지 않는다.
-6. 합의 스냅샷·해시, 양측 승인, tx hash, 서버 차단 이유, 단계별 Kiln 토큰 사용량을 `flow_id`로 연결해 저장한다. 합의 해시 계산·서명 검증은 백엔드/블록체인 담당이 맡는다.
-
-## 시연 데이터
-
-- GPU 한 모델군에 판매자 2~3명의 **가상** 매물을 만든다. 가격, 배송일, 보증 조건, 상태 설명을 서로 다르게 설정한다.
-- 구매 조건 3세트(기본, 예산 감소, 배송 기한 단축)를 준비한다. 설명과 증빙이 충돌하는 매물도 1건 포함한다.
-- 모든 가상 매물에 `demo/synthetic` 표시를 붙인다. 임의 가격을 실제 판매 기록이나 공식 시세로 설명하지 않는다. 실제 연락처·주소·개인키는 넣지 않는다.
-
-## 완료 기준
-
-- 빈 DB에서 초기화와 시드를 실행하면 같은 데모 매물이 만들어진다.
-- 매물 검색은 모델·재고·배송 조건을 적용하고, 상대의 비공개 가격 한계를 반환하지 않는다.
-- `flow_id`로 제안, 조건 검사/차단, 양측 승인, 체인 영수증, 단계별 토큰 사용량을 순서대로 조회할 수 있다.
-- 매물 설명을 수정해도 이미 승인한 합의 스냅샷은 바뀌지 않는다. 실제 테스트넷 거래에 연결된 기록은 시연 증거로 보존한다.
-
-백엔드에는 DB 함수와 시드 ID를, 프론트에는 데모 매물과 증빙 상태를 전달한다. 작업 보고에는 변경 파일, 초기화·시드·조회 검증 결과와 남은 제약을 적는다.
+검증: python -m pytest backend/tests/data backend/tests/integration -q; npm --prefix e2e test. A~E, 동시 승인/정책 변경/UNKNOWN/보안/실제 UI 복구 증거는 reports/VALIDATION.md에 있다. 실제 모델 호출 및 허용 테스트넷 증거는 자격 증명/설정 부재로 미실행이다.

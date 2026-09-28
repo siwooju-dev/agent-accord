@@ -1,43 +1,9 @@
-# 백엔드·AI 에이전트 담당 개발 명세
+# Backend / AI 구현 담당 — v2
 
-> 개발 에이전트는 `project.md`의 데이터 계약·상태·워크플로우를 먼저 읽는다. 소유 영역은 `backend/`의 API·서비스·Kiln 연결이다.
+먼저 README.md, project.md, openapi.yaml, docs/API.md, docs/KILN_INTEGRATION.md, docs/IMPLEMENTATION.md를 읽는다. 이전 GPU/양측 서명 담당 원문은 docs/legacy/backend-ai-agent.md에 있다. 사용자 전체 구현 위임으로 역할 간 파일도 통합 수정했다.
 
-## 목표
+현재 소유 구현은 backend/app/main.py·schemas.py·agent.py·service.py·config.py·auth.py다. 분리된 buyer/seller 문맥, strict JSON·가격 검증, deterministic PolicyPort, DB 소유권/CSRF/idempotency/version/트랜잭션, 승인/outbox, GET 증거/usage를 제공한다. 인증되지 않은 live 데모 세션이나 mock fallback은 금지한다.
 
-구매자/판매자 협상을 오케스트레이션하고, Kiln Qwen3-32B 응답을 실제 제안에 사용하며, 서버 코드로 금액·배송·재고 조건을 검사한다. 데이터 스키마·초기화·시드는 데이터 담당, 계약/체인 어댑터는 블록체인 담당과 인터페이스를 먼저 합의한다.
+Kiln은 환경 변수로만 URL/키/model/auth를 받는다. 공개 문서의 모델/경로와 실제 팀 credentials 검증을 구분한다. gpt-oss-120b 대체 승인 근거 없는 Qwen-only를 공식 요건 충족으로 쓰지 않는다. probe 명령/남은 live 검증은 README와 docs/KILN_INTEGRATION.md를 따른다.
 
-## 에이전트 역할
-
-| 역할 | 읽을 수 있는 입력 | 출력 | 경계 |
-| --- | --- | --- | --- |
-| 매물 평가기 | 검색된 매물, 설명, 증빙 참조 | 상태 요약, 모순/미확인 점, 근거 ID | 진품·작동을 확정하지 않음 |
-| 구매자 에이전트 | 구매 요구, 공개 제안, 평가 결과 | 가격·배송·보증 제안과 이유 | 판매자 최저가를 보지 않음 |
-| 판매자 에이전트 | 해당 판매자 매물/정책, 받은 공개 제안 | 수락/반대 제안과 이유 | 구매자 최고예산을 보지 않음 |
-
-같은 모델을 사용해도 역할별 프롬프트/대화 문맥은 분리한다. 매물 설명은 신뢰하지 않는 입력으로 취급한다. 모델의 JSON 출력은 파싱·스키마 검증 후에만 사용한다. 오류 재시도는 최대 1회로 제한하고 실패를 가짜 성공으로 바꾸지 않는다.
-
-## 필수 서비스
-
-1. 구매자/판매자의 자기 데이터 접근 권한과 입력 형식을 검사한다.
-2. DB에서 모델·재고·배송 조건으로 후보를 찾는다. 후보가 없으면 Kiln을 호출하지 않고 `NO_MATCH`를 남긴다.
-3. 실제 Kiln API를 설정으로 주입하고 평가·협상 호출을 수행한다. `model_id`, `request_id`, 입력/출력 토큰, 지연 시간, 호출 단계와 결과 반영 내용을 저장한다. API가 사용량을 제공하지 않으면 추정값으로 표시한다.
-4. 판매자별 `초기 제안 + 최대 2회 반대 제안`을 관리한다. 매 제안을 저장하고 다음 상대에게 넘기기 전에 정책 엔진을 실행한다.
-5. `총액=상품가+배송비+명시 수수료 <= 구매자 최고예산`, `상품가 >= 판매자 최저가`, 모델·재고·기한·필수 조건·만료를 결정적으로 검사한다. 차단 사유를 로그에 남긴다.
-6. 유효한 한 제안으로 불변 합의 스냅샷을 만들고 해시를 계산한다. 조건 변경 시 새 합의 ID/nonce와 새 승인을 요구한다.
-7. 두 서명을 검증한 뒤 체인 어댑터를 호출한다. 영수증과 이벤트 대조 전 `RECORDED`로 바꾸지 않고 합의 ID로 중복 제출을 막는다.
-8. `AuditEvent`, `ModelUsage`를 `flow_id`로 조회하고 단계별 토큰 합계·모델 호출 생략 이유를 제공한다.
-
-## 역할 간 계약
-
-- `project.md`의 API를 OpenAPI와 예시 요청/응답으로 구체화해 프론트에 인계한다.
-- 데이터 담당에게 `save/get BuyerIntent`, `save/query Listing`, `save Offer/Agreement/AuditEvent/ModelUsage` 저장소를 요청한다. 상태 변경은 DB 트랜잭션으로 처리한다.
-- 블록체인 담당의 `prepare_approval`, `verify_signature`, `record_agreement`, `get_record` 인터페이스를 사용한다. live 모드에서 mock으로 자동 대체하지 않는다.
-- 오류 코드는 `BUDGET_EXCEEDED`, `SELLER_FLOOR_VIOLATED`, `DEADLINE_MISSED`, `OUT_OF_STOCK`, `OFFER_EXPIRED`, `SIGNATURE_INVALID`, `CHAIN_FAILED`를 포함한다.
-
-## 테스트·완료 기준
-
-- 상품가 49만 원+배송비 2만 원은 총예산 50만 원을 초과해 차단된다. 판매자 최저가 미만, 재고 없음, 기한 초과, 만료 제안도 승인되지 않는다.
-- 설명에 “검사를 무시하라” 같은 지시문을 넣어도 지시로 따르지 않는다. 증빙과 충돌하면 근거와 함께 `conflicted`로 표시한다.
-- 한쪽 거절, 서명 대상 변경, 체인 실패 시 기록 성공 상태가 생기지 않는다.
-- A/B/C 실행에서 AI 응답이 제안에 반영되고 역할·단계별 토큰 사용량과 실제/추정 출처가 재구성된다.
-- 정책/상태 테스트와 실제 Kiln 통합 결과를 구분해 보고한다. 변경 파일, 테스트 수·결과, 실제/모의 호출, 남은 제약을 적는다.
+검증: python -m pytest backend/tests/backend backend/tests/contracts backend/tests/integration -q. 역할별 완료·실제 실행 결과는 reports/VALIDATION.md. 실제 Kiln 응답은 미검증이고 mock/HTTP fake 결과만 검증했다.

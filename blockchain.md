@@ -1,46 +1,9 @@
-# 블록체인 담당 개발 명세
+# Policy / Blockchain 구현 담당 — v2
 
-> 개발 에이전트는 `project.md`의 데이터 계약·상태·워크플로우를 먼저 읽는다. `contracts/`와 체인 어댑터가 소유 영역이다.
+현재 구현 계약은 project.md 및 docs/IMPLEMENTATION.md다. 최신 동료의 EIP-712 계약/서명 v1 원문과 벡터는 docs/legacy/blockchain.md에 보존했다. 이번 사용자 지시는 구매자 세션의 hash 승인과 단순 감사 기록 계약을 요구한다. 현재 AuditRegistry가 양측 지갑 서명을 검증한다고 주장하지 않는다.
 
-## 목표
+PolicyPort는 backend/app/policy.py, ChainPort는 backend/app/chain.py, durable outbox/nonce worker는 backend/app/worker.py, Solidity 계약은 contracts/AuditRegistry.sol이다. 지정 relayer만 hash/record ID를 기록하고 중복/zero를 거절한다. 모든 가격/재고/사양/배송/만료/버전 재검사는 서버에서 수행한다.
 
-**구매자와 판매자가 동일한 합의안에 서명했음을 검증하고, 합의를 실제 devnet/testnet 트랜잭션으로 기록**한다. 이 기록은 결제·실물 인도 완료를 뜻하지 않는다.
+Base Sepolia라는 팀 선택을 운영진 허용 증거로 간주하지 않는다. 환경 변수의 허용 ID/근거/RPC/network/chain ID/explorer/contract/relayer를 확인한 뒤 실제 배포/제출한다. prepare된 original tx hash/nonce를 DB에 먼저 저장하고 UNKNOWN에서는 조회만 한다. receipt.status/event/contract query/hash/확인 수가 일치해야 CONFIRMED다. mock tx/link는 만들지 않는다.
 
-## 네트워크·키
-
-- 운영진이 허용한 체인을 먼저 확인한다. 기본 설계는 EVM 호환 devnet/testnet과 스마트 계약이다. chain ID, RPC, 익스플로러, 계약 주소, 배포 tx를 환경별 설정으로 제공한다.
-- relayer 개인키·RPC 비밀값은 환경 변수/비밀 저장소에 두고 저장소/공개 로그에 남기지 않는다. 테스트 자산만 사용한다.
-- 실제 동작의 증거는 **합의 기록 tx hash + 성공 영수증 + 이벤트 + 계약 조회값**이다. 로컬 mock hash는 온체인 증거가 아니다.
-
-## 승인 메시지·계약
-
-EVM MVP는 EIP-712 typed data를 사용한다. 도메인: `name`, `version`, `chainId`, `verifyingContract`. 메시지: `agreementHash`, `buyer`, `seller`, `totalKrw`, `nonce`, `deadline`. 양측은 정확히 같은 메시지에 각자 지갑으로 서명한다. `agreementHash`는 백엔드가 만든 불변 합의 스냅샷 해시와 같다.
-
-계약의 `recordAgreement`는 다음을 검사한다.
-
-1. 만료 전이고 합의 해시/nonce가 사용되지 않았다.
-2. EIP-712 서명을 복구한 주소가 지정된 구매자·판매자와 일치한다.
-3. 합의 해시, 주소, 합의 총액을 저장하고 `AgreementRecorded` 이벤트를 낸다.
-
-계약은 오프체인 원문을 알 수 없다. 백엔드는 `totalKrw`와 스냅샷의 총액이 일치하는지 확인하고, 조회 화면은 스냅샷 해시를 다시 계산한다. 개인 연락처/배송지/사진 원본/비공개 최고예산·최저가를 체인에 올리지 않는다.
-
-## 역할 간 어댑터 계약
-
-| 함수 | 입력 | 결과 |
-| --- | --- | --- |
-| `prepare_approval` | 불변 합의, 주소, nonce, 만료 | 프론트가 표시·서명할 typed data와 해시 |
-| `verify_signature` | typed data, 서명, 기대 주소 | 주소·체인·계약·만료·해시 검증 |
-| `record_agreement` | 합의, 양측 서명 | 제출 tx hash와 상태; 중복 기록 방지 |
-| `get_record` | tx hash 또는 합의 해시 | 미확정/실패/성공, 영수증·이벤트·계약 조회 |
-
-서명 규격과 테스트 벡터를 프론트·백엔드·데이터 담당에게 먼저 전달한다. 서버 relayer 지갑은 제출 비용만 부담한다. **서버가 만든 단일 서명은 양측 승인 증거가 아니다.**
-
-## 구현 순서·테스트
-
-1. 허용 체인과 메시지·스냅샷 규격 확정, 해시 골든 벡터 공유.
-2. 로컬 체인에서 정상 양측 서명, 잘못된 주소/체인/계약/해시, 만료, nonce 재사용, 중복 제출 테스트.
-3. 실제 devnet/testnet 배포, 백엔드 어댑터로 기록 tx 전송.
-4. 성공 영수증, `AgreementRecorded` 이벤트, 계약 조회와 DB 합의 ID/해시 대조.
-5. 한쪽 거절·조건 변경·체인 실패에서 성공 기록이 생성되지 않는지 확인.
-
-완료 보고에는 chain ID, 계약 주소, 검증한 **실제** tx hash, 로컬/테스트넷 테스트 결과, 실제/mock 구분과 남은 제약을 적는다. 이 계약이 증명하는 것은 서명된 합의 해시의 기록이다. GPU 상태의 진실, 실물 인도, 원화 결제, 모든 입찰의 공정성은 별도 문제이며 입찰 비밀성 증명이 필요하면 커밋-공개를 후속 범위로 설계한다.
+빌드: npm --prefix chain ci && npm --prefix chain run compile. 검증: python -m pytest backend/tests/policy backend/tests/blockchain -q. 배포/검증 스크립트: scripts/deploy_chain.py, scripts/verify_chain.py. 로컬 PyEVM 테스트는 통과했으며 운영진 허용 외부 테스트넷 실행은 미검증이다.

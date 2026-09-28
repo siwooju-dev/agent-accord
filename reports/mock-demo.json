@@ -1,0 +1,114 @@
+[
+  {
+    "scenario": "A",
+    "mode": "mock",
+    "status": "MOCK_RECORDED",
+    "reason_codes": [],
+    "agreed_total_krw": 946200,
+    "usage": {
+      "calls": [
+        {
+          "id": "ded4d2e05ac548a4bc80d9cd12d27bfa",
+          "stage": "negotiation",
+          "actor": "buyer",
+          "model_id": "mock-rule-agent",
+          "prompt_tokens": null,
+          "completion_tokens": null,
+          "total_tokens": null,
+          "latency_ms": 0,
+          "request_id": null,
+          "usage_source": "unavailable",
+          "adapter_mode": "mock",
+          "error_code": null,
+          "created_at": "2026-09-28T23:40:45.862Z"
+        },
+        {
+          "id": "c162702b39f444e4bb3244c0dd7e72a4",
+          "stage": "negotiation",
+          "actor": "seller",
+          "model_id": "mock-rule-agent",
+          "prompt_tokens": null,
+          "completion_tokens": null,
+          "total_tokens": null,
+          "latency_ms": 0,
+          "request_id": null,
+          "usage_source": "unavailable",
+          "adapter_mode": "mock",
+          "error_code": null,
+          "created_at": "2026-09-28T23:40:45.869Z"
+        }
+      ],
+      "call_count": 2,
+      "provider_total_tokens": null,
+      "unavailable_calls": 2,
+      "by_stage": {
+        "negotiation:buyer": {
+          "calls": 1,
+          "provider_total_tokens": null,
+          "unavailable_calls": 1
+        },
+        "negotiation:seller": {
+          "calls": 1,
+          "provider_total_tokens": null,
+          "unavailable_calls": 1
+        }
+      },
+      "energy": "unmeasured"
+    },
+    "chain": {
+      "record_id": "91f8d1c8d6a1274b06f8d676fcc6fa47bda37c231f2ab266cd52709a2f6de3b6",
+      "adapter_mode": "mock",
+      "status": "MOCK_RECORDED",
+      "audit_hash": "e1d29c94ab33629d54231192a5a1a412bdf63a3e1a0aaab70d3ae5393fd51686",
+      "chain_id": null,
+      "contract": null,
+      "tx_hash": null,
+      "nonce": null,
+      "explorer_url": null,
+      "receipt": {
+        "simulated": true,
+        "record_id": "91f8d1c8d6a1274b06f8d676fcc6fa47bda37c231f2ab266cd52709a2f6de3b6"
+      },
+      "event": {
+        "simulated": true,
+        "audit_hash": "e1d29c94ab33629d54231192a5a1a412bdf63a3e1a0aaab70d3ae5393fd51686"
+      }
+    }
+  },
+  {
+    "scenario": "B",
+    "mode": "mock",
+    "status": "BLOCKED",
+    "reason_codes": [
+      "BUDGET_EXCEEDED"
+    ],
+    "agreed_total_krw": null,
+    "usage": {
+      "calls": [],
+      "call_count": 0,
+      "provider_total_tokens": null,
+      "unavailable_calls": 0,
+      "by_stage": {},
+      "energy": "unmeasured"
+    },
+    "chain": null
+  },
+  {
+    "scenario": "C",
+    "mode": "mock",
+    "status": "BLOCKED",
+    "reason_codes": [
+      "SELLER_NOT_ALLOWED"
+    ],
+    "agreed_total_krw": null,
+    "usage": {
+      "calls": [],
+      "call_count": 0,
+      "provider_total_tokens": null,
+      "unavailable_calls": 0,
+      "by_stage": {},
+      "energy": "unmeasured"
+    },
+    "chain": null
+  }
+]
