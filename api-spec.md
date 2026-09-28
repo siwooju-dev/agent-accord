@@ -187,6 +187,8 @@ EVM에서 `typed_data`는 [EIP-712](https://eips.ethereum.org/EIPS/eip-712) 형�
 
 서버 내부 정책 엔진은 두 비공개 한계값을 읽을 수 있지만, 상대 에이전트의 입력/응답, API 응답, 공개 로그에는 넣지 않는다. 판매자 자유 설명은 외부 입력으로 취급하고 그 안의 지시문을 에이전트 명령으로 실행하지 않는다.
 
+백엔드는 세션 역할·소유권별 응답 DTO를 별도로 직렬화한다. 내부 `BuyerIntent`/`SellerPolicy` 객체를 그대로 JSON으로 반환하지 않는다. 구매자 세션의 매물·협상·합의·감사 응답에는 `min_item_price_krw`가 없어야 하고, 판매자 세션의 합의·감사 응답에는 `max_total_krw`가 없어야 한다. 권한별 API 테스트에서 응답 본문을 검사하며, 프론트는 실제 네트워크 응답을 확인한다. 화면에서 필드를 숨기는 것은 서버 응답 누출을 해결하지 못한다.
+
 ## 6. 상태·전이
 
 - 협상: `DRAFT → NEGOTIATING → PROPOSED → AWAITING_APPROVALS`; 유효 후보가 없거나 모든 제안이 차단되면 `NO_MATCH/BLOCKED`로 끝난다.
