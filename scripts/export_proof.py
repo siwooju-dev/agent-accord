@@ -39,7 +39,7 @@ def won(value: int | None) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--db", default="data/live.sqlite3")
+    parser.add_argument("--db", action="append", default=[], help="database (repeatable; default data/live.sqlite3)")
     parser.add_argument("--log", default="data/kiln_calls.jsonl")
     parser.add_argument("--flow", action="append", default=[], help="flow id to export (repeatable)")
     parser.add_argument("--label", action="append", default=[], help="flow_id=표시 이름")
@@ -50,18 +50,21 @@ def main() -> int:
 
     explorer = os.getenv("CHAIN_EXPLORER_URL", "https://sepolia.basescan.org").rstrip("/")
     labels = dict(item.split("=", 1) for item in args.label)
-    db_path = (ROOT / args.db) if not Path(args.db).is_absolute() else Path(args.db)
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    connections = [sqlite3.connect(f"file:{(ROOT / db) if not Path(db).is_absolute() else Path(db)}?mode=ro", uri=True)
+                   for db in (args.db or ["data/live.sqlite3"])]
+    browser_buyer = os.getenv("DEMO_BUYER_WALLET", "").lower()
 
     log_path = (ROOT / args.log) if not Path(args.log).is_absolute() else Path(args.log)
     calls: list[dict] = []
     if log_path.exists():
         calls = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
-    intents = {item["id"]: item for item in rows(conn, "intent")}
-    agreements = {item["id"]: item for item in rows(conn, "agreement")}
-    listings = {item["id"]: item for item in rows(conn, "listing")}
-    negotiations = rows(conn, "negotiation")
+    intents, agreements, listings, negotiations = {}, {}, {}, []
+    for conn in connections:
+        intents.update({item["id"]: item for item in rows(conn, "intent")})
+        agreements.update({item["id"]: item for item in rows(conn, "agreement")})
+        listings.update({item["id"]: item for item in rows(conn, "listing")})
+        negotiations += [(conn, item) for item in rows(conn, "negotiation")]
     wanted = set(args.flow) or {call["flow_id"] for call in calls if call.get("flow_id")}
 
     web3 = None
@@ -72,7 +75,7 @@ def main() -> int:
 
     deployment = json.loads((ROOT / "blockchain/deployments/base-sepolia.json").read_text(encoding="utf-8"))
     flows, exported_calls = [], []
-    for negotiation in negotiations:
+    for conn, negotiation in negotiations:
         flow_id = negotiation["flow_id"]
         if flow_id not in wanted:
             continue
@@ -93,6 +96,9 @@ def main() -> int:
         flows.append({
             "flow_id": flow_id,
             "label": labels.get(flow_id, flow_id),
+            "signed_by": None if not agreement else (
+                "MetaMask in the web UI" if (agreement.get("snapshot") or {}).get("buyer_wallet") == browser_buyer
+                else "local test wallets via scripts/run_flows.py"),
             "started_at": negotiation["created_at"],
             "intent": {key: intent.get(key) for key in ("gpu_model", "max_total_krw", "delivery_deadline", "must_have")},
             "negotiation_status": negotiation.get("status"),
@@ -120,6 +126,9 @@ def main() -> int:
             },
         })
 
+    order = list(labels)
+    flows.sort(key=lambda flow: (order.index(flow["flow_id"]) if flow["flow_id"] in order else len(order), flow["started_at"]))
+    exported_calls.sort(key=lambda call: (order.index(call["flow_id"]) if call.get("flow_id") in order else len(order), call.get("at", "")))
     (DOCS / "proof").mkdir(parents=True, exist_ok=True)
     (DOCS / "proof" / "flows.json").write_text(json.dumps(flows, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     (DOCS / "proof" / "kiln_calls.jsonl").write_text(
@@ -135,7 +144,7 @@ def main() -> int:
            f"- Deployment tx: [`{deployment['deployment']['tx_hash']}`]({explorer}/tx/{deployment['deployment']['tx_hash']})",
            f"- Relayer (only address allowed to record): `{deployment['relayer_address']}`", ""]
     total_cost = sum(flow["kiln"]["cost_usd"] for flow in flows)
-    out += ["## Summary", "", "| Flow | Buyer condition | Kiln calls | Kiln cost | Agreement | On-chain tx |", "|---|---|---|---|---|---|"]
+    out += ["## Summary", "", "| Flow | Buyer condition | Kiln calls | Kiln cost | Agreement | Signed by | On-chain tx |", "|---|---|---|---|---|---|---|"]
     for flow in flows:
         intent, agreement = flow["intent"], flow["agreement"] or {}
         tx = agreement.get("tx_hash")
@@ -143,6 +152,7 @@ def main() -> int:
             f"| {flow['label']} | {intent.get('gpu_model')} · 예산 {won(intent.get('max_total_krw'))} · 기한 {(intent.get('delivery_deadline') or '')[:10]} "
             f"| {flow['kiln']['ok']}/{flow['kiln']['calls']} | ${flow['kiln']['cost_usd']:.6f} "
             f"| {agreement.get('status', flow['negotiation_status'])} {won(agreement.get('total_krw')) if agreement else ''} "
+            f"| {flow['signed_by'] or '-'} "
             f"| {f'[`{tx[:10]}…{tx[-6:]}`]({explorer}/tx/{tx})' if tx else '-'} |")
     total_tokens = sum(flow["kiln"]["input_tokens"] + flow["kiln"]["output_tokens"] for flow in flows)
     total_skipped = sum(len(flow["skipped_candidates"]) for flow in flows)
@@ -164,7 +174,7 @@ def main() -> int:
         if agreement:
             out += [f"- Agreement `{agreement['id']}` · {agreement['status']} · total {won(agreement['total_krw'])}",
                     f"- Snapshot hash (signed by buyer and seller, EIP-712): `{agreement['snapshot_hash']}`",
-                    f"- Buyer wallet `{agreement['buyer_wallet']}` · seller wallet `{agreement['seller_wallet']}`"]
+                    f"- Buyer wallet `{agreement['buyer_wallet']}` · seller wallet `{agreement['seller_wallet']}` · signed by {flow['signed_by']}"]
             if agreement.get("tx_hash"):
                 out.append(f"- **Tx**: [`{agreement['tx_hash']}`]({explorer}/tx/{agreement['tx_hash']}) · block {agreement['block_number']}"
                            + (f" · RPC re-check: status {agreement['rpc_check']['status']}, {agreement['rpc_check']['logs']} log(s)" if agreement.get("rpc_check") else ""))
