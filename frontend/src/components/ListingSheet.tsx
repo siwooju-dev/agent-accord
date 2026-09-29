@@ -221,6 +221,10 @@ export function ListingSheet({
           <div className="side-top">
             <span className="side-count">
               {index + 1} / {items.length}
+              <span className="kbd-hint" aria-hidden="true">
+                <kbd>←</kbd>
+                <kbd>→</kbd> 이동 · <kbd>Esc</kbd> 닫기
+              </span>
             </span>
             <button className="sheet-close" type="button" onClick={onClose} aria-label="닫기 (Esc)">
               <Icon name="close" size={18} />

@@ -125,7 +125,9 @@
 /* side */
 .sheet-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 18px 24px 24px; overflow-y: auto; overscroll-behavior: contain; border-left: 1px solid var(--line); }
 .side-top { display: flex; justify-content: space-between; align-items: center; }
-.side-count { color: var(--fg-3); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.side-count { display: inline-flex; align-items: center; gap: 10px; color: var(--fg-3); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.kbd-hint { display: inline-flex; align-items: center; gap: 3px; color: var(--fg-3); font-weight: 500; }
+.kbd-hint kbd { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 5px; background: var(--surface-2); box-shadow: inset 0 -1px 0 var(--line-2); color: var(--fg-2); font: 600 11px/1 var(--font); }
 .sheet-close { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--fg-2); transition: background-color 0.15s ease-out, color 0.15s ease-out; }
 .sheet-close:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 10%, var(--surface-2)); }
 .side-eyebrow { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--accent-ink); font-size: 12.5px; font-weight: 700; }
@@ -275,5 +277,15 @@
   .side-count { display: none; }
   .stage-nav { opacity: 1; }
   .rc-callout { left: auto; right: 12px; }
-  .serial-hl em { left: auto; right: 0; top: auto; bottom: calc(100% + 8px); transform: none; }
+  .serial-hl em { left: 0; top: calc(100% + 6px); transform: none; }
+  .sheet-head { flex-wrap: wrap; align-items: flex-start; padding-right: 48px; }
+  .stage-doc, .stage-serial { padding: 14px; place-items: start center; }
+  .stage-serial { justify-content: flex-start; }
+  .wr { padding: 14px; }
+  .wr-head { grid-template-columns: auto 1fr; }
+  .wr-head .pill { grid-column: 1 / -1; justify-self: start; }
+  .wr-query { flex-direction: column; gap: 2px; }
+  .wr-table { font-size: 12.5px; }
+  .rc-shot, .rc-thermal { transform: scale(0.92); transform-origin: top center; }
+  .kbd-hint { display: none; }
 }

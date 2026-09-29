@@ -488,6 +488,7 @@ function LookBar({ look, setLook }: { look: LookId; setLook: (id: LookId) => voi
 function BackendChip() {
   const [info, setInfo] = useState<{ mode?: string; contract?: string } | null>(null);
   useEffect(() => {
+    if (import.meta.env.VITE_BACKEND_PROBE === "off") return;
     const controller = new AbortController();
     fetch("/__backend/health", { signal: controller.signal, headers: { Accept: "application/json" } })
       .then((response) => (response.ok ? response.json() : null))

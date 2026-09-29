@@ -734,7 +734,8 @@
 .integrity.good { color: var(--pass-ink, var(--pass)); }
 .integrity.bad { color: var(--block); }
 
-.approve { display: grid; gap: 14px; }
+.approve { display: flex; flex-direction: column; gap: 14px; }
+.approve .sign-btn { margin-top: auto; }
 .approve.role-buyer { --role: var(--buyer); --role-soft: var(--buyer-soft); }
 .approve.role-seller { --role: var(--seller); --role-soft: var(--seller-soft); }
 .approve .card-head { margin-bottom: 0; }
