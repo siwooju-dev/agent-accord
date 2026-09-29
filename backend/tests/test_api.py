@@ -41,10 +41,10 @@ def headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def create_intent(client: TestClient, token: str, max_total: int = 500_000) -> dict:
-    deadline = (datetime.now(timezone.utc) + timedelta(days=8)).replace(microsecond=0)
+def create_intent(client: TestClient, token: str, max_total: int = 2_400_000) -> dict:
+    deadline = (datetime.now(timezone.utc) + timedelta(days=10)).replace(microsecond=0)
     response = client.post("/api/buyer-intents", headers=headers(token), json={
-        "gpu_model": "RTX 3070",
+        "gpu_model": "RTX 4090",
         "max_total_krw": max_total,
         "delivery_deadline": deadline.isoformat().replace("+00:00", "Z"),
         "must_have": ["evidence_present"],
@@ -151,14 +151,14 @@ def test_counter_offer_is_not_selected_until_buyer_agent_accepts(demo):
     class CounterAgent(MockAgent):
         def buyer_offer(self, intent, listing, assessment):
             return {
-                "item_price_krw": 420_000,
+                "item_price_krw": 1_850_000,
                 "delivery_by": listing["private_policy"]["earliest_delivery_at"],
                 "warranty_terms": "판매자 주장 보증",
             }, None
 
         def seller_reply(self, listing, buyer_offer):
             return {"action": "counter", "item_price_krw": max(
-                listing["private_policy"]["min_item_price_krw"], 430_000,
+                listing["private_policy"]["min_item_price_krw"], 1_900_000,
             )}, None
 
     app.state.agent = CounterAgent()
@@ -170,7 +170,7 @@ def test_counter_offer_is_not_selected_until_buyer_agent_accepts(demo):
     assert negotiation["offers"]
     assert all(offer["round"] == 2 and offer["proposer"] == "seller"
                for offer in negotiation["offers"])
-    assert negotiation["offers"][0]["item_price_krw"] >= 430_000
+    assert negotiation["offers"][0]["item_price_krw"] >= 1_900_000
     assert all("seller_id" not in offer and "assessment" not in offer for offer in negotiation["offers"])
 
 
@@ -182,14 +182,14 @@ def test_rejected_counter_does_not_create_an_agreement(demo):
     class RejectCounterAgent(MockAgent):
         def buyer_offer(self, intent, listing, assessment):
             return {
-                "item_price_krw": 420_000,
+                "item_price_krw": 1_850_000,
                 "delivery_by": listing["private_policy"]["earliest_delivery_at"],
                 "warranty_terms": "판매자 주장 보증",
             }, None
 
         def seller_reply(self, listing, buyer_offer):
             return {"action": "counter", "item_price_krw": max(
-                listing["private_policy"]["min_item_price_krw"], 430_000,
+                listing["private_policy"]["min_item_price_krw"], 1_900_000,
             )}, None
 
         def buyer_reply(self, intent, listing, assessment, buyer_offer, seller_counter):
@@ -211,7 +211,7 @@ def test_rejected_counter_does_not_create_an_agreement(demo):
 def test_candidates_outside_budget_are_blocked_without_exposing_seller_floor(demo):
     _app, client, _accounts = demo
     buyer_token, _ = login(client, "buyer-demo")
-    intent = create_intent(client, buyer_token, max_total=430_000)
+    intent = create_intent(client, buyer_token, max_total=1_890_000)
     started = start_negotiation(client, buyer_token, intent["id"], "too-low-budget")
     negotiation = client.get(
         f"/api/negotiations/{started['id']}", headers=headers(buyer_token),
@@ -229,15 +229,15 @@ def test_session_role_ownership_and_idempotency_conflicts_are_enforced(demo):
     buyer_token, _ = login(client, "buyer-demo")
     seller_one, _ = login(client, "seller-demo-1")
     intent = create_intent(client, buyer_token)
-    changed_intent = create_intent(client, buyer_token, max_total=480_000)
+    changed_intent = create_intent(client, buyer_token, max_total=2_300_000)
     listing_payload = {
-        "gpu_model": "RTX 3070", "asking_price_krw": 470_000,
-        "min_item_price_krw": 430_000, "shipping_fee_krw": 10_000,
+        "gpu_model": "RTX 4090", "asking_price_krw": 1_990_000,
+        "min_item_price_krw": 1_900_000, "shipping_fee_krw": 10_000,
         "earliest_delivery_at": (datetime.now(timezone.utc) + timedelta(days=2)).replace(
             microsecond=0,
         ).isoformat().replace("+00:00", "Z"),
         "condition_text": "sample listing", "warranty_end": "2027-01-31",
-        "stock_status": "available", "evidence_ids": ["evidence-demo-2"],
+        "stock_status": "available", "evidence_ids": ["evidence-04"],
     }
     wrong_evidence = client.post("/api/listings", headers=headers(seller_one), json=listing_payload)
     assert wrong_evidence.status_code == 422

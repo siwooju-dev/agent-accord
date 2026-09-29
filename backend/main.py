@@ -14,7 +14,7 @@ from web3 import Web3
 
 from blockchain import AgreementChain, ChainConfig, ChainError, SubmissionUnknown
 from blockchain.signing import ApprovalError, approval_payload, snapshot_hash, verify_approval_signature
-from .agent import AgentError, KilnAgent, MockAgent
+from .agent import CALL_CONTEXT, AgentError, KilnAgent, MockAgent
 from .config import Settings
 from .models import (
     AgreementView, ApprovalPayloadView, AuditView, BuyerIntentInput,
@@ -23,7 +23,7 @@ from .models import (
     NegotiationView,
 )
 from .policy import evaluate_offer
-from .store import Store, new_id, parse_time, utc_now, utc_stamp
+from .store import Store, evidence_hash, new_id, parse_time, utc_now, utc_stamp
 
 
 class ApiError(Exception):
@@ -47,6 +47,10 @@ ERROR_MESSAGES = {
     "SIGNATURE_INVALID": "현재 사용자 지갑의 유효한 서명이 아닙니다.",
     "CHAIN_CONFIG_UNAVAILABLE": "블록체인 서명 설정이 없습니다.",
     "KILN_UNAVAILABLE": "Kiln 모델 서비스에 연결할 수 없습니다.",
+    "KILN_AUTH_FAILED": "Kiln API 키가 올바르지 않습니다.",
+    "KILN_CREDITS_EXHAUSTED": "Kiln 크레딧이 부족합니다.",
+    "KILN_RATE_LIMITED": "Kiln 호출 한도에 걸렸습니다. 잠시 후 다시 시도하세요.",
+    "KILN_TIMEOUT": "Kiln 응답이 너무 늦어 중단했습니다.",
     "KILN_MODEL_UNAVAILABLE": "Kiln에서 설정한 모델을 사용할 수 없습니다.",
     "INVALID_MODEL_OUTPUT": "모델 응답을 검증할 수 없어 제안을 중단했습니다.",
     "VALIDATION_ERROR": "요청 조건을 확인해 주세요.",
@@ -381,10 +385,12 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
         intent = store.get("intent", negotiation["buyer_intent_id"])
         if not intent:
             return
-        listings = [
-            item for item in store.list("listing")
-            if item["gpu_model"].casefold() == intent["gpu_model"].casefold()
-        ][:3]
+        # One candidate per seller: a seller's newest listing for this model replaces older ones.
+        latest_by_seller: dict[str, dict[str, Any]] = {}
+        for item in store.list("listing"):
+            if item["gpu_model"].casefold() == intent["gpu_model"].casefold():
+                latest_by_seller[item["seller_id"]] = item
+        listings = list(latest_by_seller.values())[:3]
         assessments: list[dict[str, Any]] = []
         offers: list[dict[str, Any]] = []
         blocked_events: list[dict[str, str]] = []
@@ -401,7 +407,17 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                                 decision="blocked", reason_code="NO_MATCH", conn=conn)
             return
 
+        def keep_usage(usage: dict[str, Any] | None) -> None:
+            if not usage:
+                return
+            usage = dict(usage)
+            repaired = usage.pop("repaired_from", None)
+            if repaired:
+                usages.append(repaired)
+            usages.append(usage)
+
         for listing in listings:
+            CALL_CONTEXT.set({"flow_id": negotiation["flow_id"], "listing_id": listing["id"]})
             # Skip model work for candidates that are already impossible at the seller floor.
             precheck = evaluate_offer(
                 intent, listing,
@@ -421,16 +437,21 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
 
             try:
                 assessment, assessment_usage = app.state.agent.assess(listing)
-                if assessment_usage:
-                    usages.append(assessment_usage)
+                keep_usage(assessment_usage)
                 assessments.append({
                     "flow_id": negotiation["flow_id"], "listing_id": listing["id"],
                     "summary": assessment["summary"], "findings": assessment["findings"],
                     "source": "mock" if settings.mode == "mock" else "kiln",
                 })
                 buyer_offer, buyer_usage = app.state.agent.buyer_offer(intent, listing, assessment)
-                if buyer_usage:
-                    usages.append(buyer_usage)
+                keep_usage(buyer_usage)
+                if buyer_offer.get("skip"):
+                    blocked_events.append({"reason_code": "BUYER_AGENT_SKIPPED"})
+                    store.add_event(
+                        negotiation["flow_id"], "buyer-agent", "LISTING_SKIPPED",
+                        object_id=listing["id"], decision="rejected", reason_code="BUYER_AGENT_SKIPPED",
+                    )
+                    continue
                 if (type(buyer_offer.get("item_price_krw")) is not int
                     or buyer_offer["item_price_krw"] <= 0
                     or buyer_offer["item_price_krw"] > listing["asking_price_krw"]):
@@ -443,8 +464,7 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                     )
                     continue
                 seller_reply, seller_usage = app.state.agent.seller_reply(listing, buyer_offer)
-                if seller_usage:
-                    usages.append(seller_usage)
+                keep_usage(seller_usage)
                 if seller_reply["action"] == "reject":
                     blocked_events.append({"reason_code": "SELLER_REJECTED"})
                     store.add_event(
@@ -453,13 +473,16 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                     )
                     continue
                 final_price = seller_reply["item_price_krw"]
+                final_delivery = buyer_offer["delivery_by"]
+                reasons = [f"구매 에이전트: {buyer_offer['reason']}"] if buyer_offer.get("reason") else []
+                if seller_reply.get("reason"):
+                    reasons.append(f"판매 에이전트: {seller_reply['reason']}")
                 offer_round = 1
                 if seller_reply["action"] == "counter":
                     buyer_reply, buyer_reply_usage = app.state.agent.buyer_reply(
                         intent, listing, assessment, buyer_offer, seller_reply,
                     )
-                    if buyer_reply_usage:
-                        usages.append(buyer_reply_usage)
+                    keep_usage(buyer_reply_usage)
                     if buyer_reply["action"] != "accept":
                         blocked_events.append({"reason_code": "BUYER_REJECTED_COUNTER"})
                         store.add_event(
@@ -469,9 +492,12 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                         )
                         continue
                     offer_round = 2
+                    final_delivery = seller_reply.get("delivery_by") or buyer_offer["delivery_by"]
+                    if buyer_reply.get("reason"):
+                        reasons.append(f"구매 에이전트 답: {buyer_reply['reason']}")
                 decision = evaluate_offer(
                     intent, listing, item_price_krw=final_price,
-                    delivery_by=buyer_offer["delivery_by"], now=now,
+                    delivery_by=_datetime_string(final_delivery), now=now,
                 )
                 if not decision["allowed"]:
                     blocked_events.extend({"reason_code": reason} for reason in decision["reason_codes"])
@@ -491,20 +517,20 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                     "item_price_krw": final_price,
                     "shipping_fee_krw": listing["shipping_fee_krw"],
                     "total_krw": decision["total_krw"],
-                    "delivery_by": _datetime_string(buyer_offer["delivery_by"]),
+                    "delivery_by": _datetime_string(final_delivery),
                     "warranty_terms": buyer_offer["warranty_terms"],
                     "expires_at": utc_stamp(now + timedelta(hours=12)),
                     "evidence_ids": list(listing["evidence_ids"]),
-                    "rationale": (
+                    "rationale": " ".join([(
                         "판매자 제안을 구매자 조건과 대조해 서버 검사를 통과했습니다."
                         if offer_round == 2 else
                         "판매자가 구매자 제안을 수락했고 구매 조건에 대한 서버 검사를 통과했습니다."
-                    ),
+                    ), *reasons])[:900],
                     "valid": True,
                     "assessment": assessments[-1],
                     "seller_id": listing["seller_id"],
                     "seller_wallet": listing["seller_wallet"],
-                    "evidence_hashes": [],
+                    "evidence_hashes": sorted(set(listing.get("evidence_hashes", []))),
                 })
                 store.add_event(
                     negotiation["flow_id"], "server", "OFFER_ALLOWED",
@@ -512,6 +538,7 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                     details={"total_krw": decision["total_krw"], "checks": decision["checks"]},
                 )
             except AgentError as exc:
+                keep_usage(exc.usage)
                 reason = exc.code
                 blocked_events.append({"reason_code": reason})
                 store.add_event(
@@ -607,7 +634,22 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
 
     @app.get("/health", response_model=HealthView)
     def health():
-        return {"status": "ok", "contract_version": "0.1", "mode": settings.mode}
+        # Public facts only: never the key, only whether one is configured.
+        relayer = None
+        if settings.relayer_private_key:
+            try:
+                from eth_account import Account
+
+                relayer = Account.from_key(settings.relayer_private_key).address
+            except Exception:
+                relayer = "invalid"
+        return {
+            "status": "ok", "contract_version": "0.1", "mode": settings.mode, "chain_mode": settings.chain_mode,
+            "kiln": {"agent": "kiln" if settings.mode == "live" else "mock", "model_id": settings.kiln_model_id,
+                     "base_url": settings.kiln_base_url, "api_key_configured": bool(settings.kiln_api_key)},
+            "chain": {"chain_id": settings.chain_id, "contract_address": settings.contract_address or None,
+                      "relayer_address": relayer, "explorer_url": settings.chain_explorer_url},
+        }
 
     @app.post("/api/demo/sessions", response_model=DemoSessionView)
     def create_session(body: DemoSessionInput, request: Request):
@@ -654,6 +696,14 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
         }
         if not set(body.evidence_ids).issubset(owned_evidence_ids):
             raise ApiError("EVIDENCE_NOT_OWNED", 422)
+        # Reuse the registered evidence records (and their hashes) for the IDs the seller attached.
+        known_evidence = {
+            item["id"]: item
+            for existing in store.list("listing")
+            if existing["seller_id"] == actor["actor_id"]
+            for item in existing.get("evidence", [])
+        }
+        evidence = [known_evidence[evidence_id] for evidence_id in body.evidence_ids if evidence_id in known_evidence]
         listing_id = new_id("listing")
         payload = {
             "seller_id": actor["actor_id"],
@@ -665,6 +715,8 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
             "warranty_end": body.warranty_end.isoformat() if body.warranty_end else None,
             "stock_status": body.stock_status,
             "evidence_ids": list(body.evidence_ids),
+            "evidence": evidence,
+            "evidence_hashes": sorted({evidence_hash(item) for item in evidence}),
             "private_policy": {
                 "min_item_price_krw": body.min_item_price_krw,
                 "earliest_delivery_at": utc_stamp(body.earliest_delivery_at),
@@ -906,13 +958,17 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
             "model_usage": usage,
             "totals": {
                 "calls": len(usage),
+                # Failed calls (e.g. 402/429) have no token counts; totals cover the calls that report usage.
                 "input_tokens": sum(value for value in input_values if isinstance(value, int))
-                    if usage and all(isinstance(value, int) for value in input_values) else None,
+                    if any(isinstance(value, int) for value in input_values) else None,
                 "output_tokens": sum(value for value in output_values if isinstance(value, int))
-                    if usage and all(isinstance(value, int) for value in output_values) else None,
+                    if any(isinstance(value, int) for value in output_values) else None,
+                "calls_with_usage": sum(1 for value in input_values if isinstance(value, int)),
                 "usage_source": "api" if usage and all(item.get("source") == "api" for item in usage)
                     else "unavailable" if any(item.get("source") == "unavailable" for item in usage)
                     else "estimated" if usage else "mock" if settings.mode == "mock" else "unavailable",
+                "cost_usd": round(sum(item["cost_usd"] for item in usage if isinstance(item.get("cost_usd"), (int, float))), 8)
+                    if any(isinstance(item.get("cost_usd"), (int, float)) for item in usage) else None,
                 "model_call_reason": "mock_agent" if settings.mode == "mock" and not usage
                     else "no_successful_usage_record" if not usage else None,
             },

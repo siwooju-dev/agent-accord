@@ -19,9 +19,9 @@ export function BuyerForm({ busy, intent, onCreate, onStart }: {
   onCreate: (value: BuyerIntentInput) => Promise<void>;
   onStart: () => Promise<void>;
 }) {
-  const [model, setModel] = useState("RTX 3070");
-  const [budget, setBudget] = useState("500000");
-  const [deadline, setDeadline] = useState(localDate(5));
+  const [model, setModel] = useState("RTX 4090");
+  const [budget, setBudget] = useState("2400000");
+  const [deadline, setDeadline] = useState(localDate(10));
   const [warranty, setWarranty] = useState(false);
   const [evidence, setEvidence] = useState(true);
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -60,15 +60,15 @@ export function SellerForm({ busy, listing, onCreate }: {
   listing: Listing | null;
   onCreate: (value: ListingInput) => Promise<void>;
 }) {
-  const [model, setModel] = useState("RTX 3070");
-  const [ask, setAsk] = useState("470000");
-  const [minimum, setMinimum] = useState("430000");
-  const [shipping, setShipping] = useState("10000");
+  const [model, setModel] = useState("RTX 4090");
+  const [ask, setAsk] = useState("1990000");
+  const [minimum, setMinimum] = useState("1900000");
+  const [shipping, setShipping] = useState("20000");
   const [earliest, setEarliest] = useState(localDate(2));
-  const [condition, setCondition] = useState("게임용 사용, 보증서 사진 있음");
-  const [warranty, setWarranty] = useState("2027-01-31");
+  const [condition, setCondition] = useState("데모 매물 · 사용 12개월 · 박스 포함 (판매자 주장)");
+  const [warranty, setWarranty] = useState("2027-02-14");
   const [stock, setStock] = useState<"available" | "sold">("available");
-  const [evidence, setEvidence] = useState("evidence-demo-1");
+  const [evidence, setEvidence] = useState("evidence-01, evidence-02");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void onCreate({
@@ -221,9 +221,9 @@ export function AuditPanel({ audit, busy, onRefresh }: { audit: Audit | null; bu
       <p>{audit.flow_id} · {audit.status}</p>
       <ul className="live-audit">{audit.events.map((event, index) => <li key={`${event.at}-${index}`}><time>{when(event.at)}</time><b>{event.event_type}</b><span>{event.actor} · {event.decision ?? "-"} · {event.reason_code ?? "-"}</span></li>)}</ul>
       <h3>모델 사용량</h3>{audit.model_usage.length > 0
-        ? <ul>{audit.model_usage.map((usage, index) => <li key={`${usage.request_id ?? usage.step}-${index}`}>{usage.actor} / {usage.step} · {usage.model_id} · 입력 {usage.input_tokens ?? "미수집"}, 출력 {usage.output_tokens ?? "미수집"} 토큰 · {usage.source}</li>)}</ul>
+        ? <ul>{audit.model_usage.map((usage, index) => <li key={`${usage.request_id ?? usage.step}-${index}`}>{usage.actor} / {usage.step} · {usage.model_id} · 입력 {usage.input_tokens ?? "미수집"}, 출력 {usage.output_tokens ?? "미수집"} 토큰{typeof usage.cost_usd === "number" ? ` · $${usage.cost_usd.toFixed(6)}` : ""} · {usage.outcome && usage.outcome !== "OK" ? usage.outcome : usage.source}{usage.request_id ? <code> {usage.request_id}</code> : null}</li>)}</ul>
         : <p>{audit.totals.usage_source === "mock" ? "로컬 mock 에이전트는 Kiln API를 호출하지 않았습니다." : "확인 가능한 모델 사용량 기록이 없습니다."}</p>}
-      <p>모델 사용량 기록: {audit.model_usage.length}건 · 입력 {tokenTotal(audit.totals.input_tokens)}토큰 · 출력 {tokenTotal(audit.totals.output_tokens)}토큰</p>
+      <p>모델 사용량 기록: {audit.model_usage.length}건 · 입력 {tokenTotal(audit.totals.input_tokens)}토큰 · 출력 {tokenTotal(audit.totals.output_tokens)}토큰{typeof audit.totals.cost_usd === "number" ? ` · 비용 $${audit.totals.cost_usd.toFixed(6)}` : ""}</p>
     </>}
   </section>;
 }

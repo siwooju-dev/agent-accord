@@ -255,6 +255,9 @@ class HealthView(BaseModel):
     status: Literal["ok"] = "ok"
     contract_version: Literal["0.1"] = "0.1"
     mode: Literal["mock", "live"]
+    chain_mode: Literal["mock", "live"] = "mock"
+    kiln: dict[str, Any] = {}
+    chain: dict[str, Any] = {}
 
 
 class ErrorBody(BaseModel):

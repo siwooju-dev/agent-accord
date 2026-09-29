@@ -13,3 +13,4 @@ contracts/cache/
 contracts/node_modules/
 contracts/build/
 .local/
+data/*.jsonl

@@ -208,8 +208,13 @@ export interface ModelUsage {
   request_id: string | null;
   input_tokens: number | null;
   output_tokens: number | null;
-  latency_ms: number;
+  latency_ms: number | null;
   source: "api" | "estimated" | "unavailable";
+  /** Kiln `usage.cost` in USD, when the provider returns it. */
+  cost_usd?: number | null;
+  attempts?: number | null;
+  /** OK, INVALID_OUTPUT (answer discarded and re-asked), or a KILN_* error code. */
+  outcome?: string | null;
 }
 
 export interface Audit {

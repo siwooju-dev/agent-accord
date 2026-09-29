@@ -28,8 +28,18 @@ export async function currentWallet(): Promise<WalletState | null> {
   return address ? { address, chainId: await wallet.getChainId() } : null;
 }
 
+/** Switches to Base Sepolia; adds the network first when the wallet doesn't know it (EIP-1193 error 4902). */
 export async function switchToBaseSepolia(): Promise<WalletState | null> {
-  await client().switchChain({ id: baseSepolia.id });
+  const wallet = client();
+  try {
+    await wallet.switchChain({ id: baseSepolia.id });
+  } catch (error) {
+    const code = (error as { code?: number; cause?: { code?: number } }).code
+      ?? (error as { cause?: { code?: number } }).cause?.code;
+    if (code !== 4902) throw error;
+    await wallet.addChain({ chain: baseSepolia });
+    await wallet.switchChain({ id: baseSepolia.id });
+  }
   return currentWallet();
 }
 

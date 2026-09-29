@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import uuid
@@ -261,34 +262,84 @@ class Store:
         return nonce
 
     def seed_demo_listings(self, actors: dict[str, dict[str, str]]) -> None:
+        """Three demo RTX 4090 listings that mirror the frontend demo. All data is fictional."""
         with self.transaction() as conn:
             row = conn.execute("SELECT COUNT(*) AS count FROM entities WHERE kind='listing'").fetchone()
             if int(row["count"]) != 0:
                 return
-            fixtures = [
-                ("seller-demo-1", "listing-demo-1", 470000, 430000, 10000, ["evidence-demo-1"]),
-                ("seller-demo-2", "listing-demo-2", 455000, 440000, 15000, ["evidence-demo-2"]),
-                ("seller-demo-3", "listing-demo-3", 488000, 460000, 0, ["evidence-demo-3"]),
-            ]
-            earliest = utc_stamp(utc_now() + timedelta(days=2))
-            for seller_id, listing_id, ask, floor, shipping, evidence_ids in fixtures:
-                actor = actors.get(seller_id)
+            for fixture in DEMO_LISTINGS:
+                actor = actors.get(fixture["seller_id"])
                 if not actor or actor.get("role") != "seller":
                     continue
+                evidence = [dict(item) for item in fixture["evidence"]]
                 payload = {
-                    "seller_id": seller_id,
+                    "seller_id": fixture["seller_id"],
                     "seller_wallet": actor["wallet_address"].lower(),
-                    "gpu_model": "RTX 3070",
-                    "asking_price_krw": ask,
-                    "shipping_fee_krw": shipping,
-                    "condition_text": "로컬 데모 매물. 상태와 증빙 원본은 실제 검증되지 않았습니다.",
-                    "warranty_end": "2027-01-31",
+                    "gpu_model": "RTX 4090",
+                    "title": fixture["title"],
+                    "asking_price_krw": fixture["ask"],
+                    "shipping_fee_krw": fixture["shipping"],
+                    "condition_text": fixture["condition"],
+                    "warranty_end": fixture["warranty_end"],
                     "stock_status": "available",
-                    "evidence_ids": evidence_ids,
+                    "evidence_ids": [item["id"] for item in evidence],
+                    "evidence": evidence,
+                    "evidence_hashes": sorted({evidence_hash(item) for item in evidence}),
                     "private_policy": {
-                        "min_item_price_krw": floor,
-                        "earliest_delivery_at": earliest,
+                        "min_item_price_krw": fixture["floor"],
+                        "earliest_delivery_at": utc_stamp(utc_now() + timedelta(days=fixture["ships_in_days"])),
                     },
                     "source": "demo/mock",
                 }
-                self.put("listing", listing_id, seller_id, payload, conn)
+                self.put("listing", fixture["listing_id"], fixture["seller_id"], payload, conn)
+
+
+def evidence_hash(item: dict[str, Any]) -> str:
+    """0x-sha256 of the evidence record as registered (id, kind, label, summary)."""
+    raw = json.dumps({key: item.get(key) for key in ("id", "kind", "label", "summary")},
+                     sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return "0x" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+# Fictional demo data. Evidence summaries describe what each attached file would show; the files
+# themselves are not verified by the backend, and the assessor is told so.
+DEMO_LISTINGS: list[dict[str, Any]] = [
+    {
+        "seller_id": "seller-demo-1", "listing_id": "listing-demo-1", "title": "RTX 4090 Founders Edition",
+        "ask": 1_950_000, "floor": 1_880_000, "shipping": 20_000, "ships_in_days": 2,
+        "warranty_end": "2027-02-14",
+        "condition": "데모 매물 · 사용 19개월 · 채굴 이력 없음 · 박스 포함 (판매자 주장)",
+        "evidence": [
+            {"id": "evidence-01", "kind": "receipt", "label": "구매 영수증",
+             "summary": "주문 내역 캡처: 2024-02 구매, 상품명 RTX 4090 Founders Edition. 판매자 제출본이며 원본 대조 안 됨."},
+            {"id": "evidence-02", "kind": "warranty", "label": "보증 조회",
+             "summary": "시리얼 보증 조회(데모 응답): 모델 RTX 4090 Founders Edition, 보증 2027-02-14까지. 매물 정보와 일치."},
+        ],
+    },
+    {
+        "seller_id": "seller-demo-2", "listing_id": "listing-demo-2", "title": "RTX 4090 Gaming OC",
+        "ask": 2_060_000, "floor": 1_990_000, "shipping": 30_000, "ships_in_days": 8,
+        "warranty_end": "2027-09-02",
+        "condition": "데모 매물 · 사용 11개월 · 박스 및 구성품 포함 (판매자 주장)",
+        "evidence": [
+            {"id": "evidence-03", "kind": "video", "label": "GPU 작동 영상",
+             "summary": "11초 작동 영상: 부하 중 GPU 61°C, 팬 정상 회전, 화면 깨짐 없음 (데모 요약)."},
+            {"id": "evidence-04", "kind": "serial", "label": "제품 시리얼 사진",
+             "summary": "박스 라벨 시리얼 사진: 일부가 가려져 전체 판독 불가."},
+            {"id": "evidence-05", "kind": "warranty", "label": "보증 조회",
+             "summary": "라벨 시리얼 보증 조회(데모 응답): 조회된 모델명이 RTX 4080 Gaming OC. 매물 모델(RTX 4090)과 불일치."},
+        ],
+    },
+    {
+        "seller_id": "seller-demo-3", "listing_id": "listing-demo-3", "title": "ROG Strix RTX 4090",
+        "ask": 2_150_000, "floor": 2_080_000, "shipping": 25_000, "ships_in_days": 4,
+        "warranty_end": "2027-11-21",
+        "condition": "데모 매물 · 사용 9개월 · 작동 영상 첨부 · 12VHPWR 케이블 포함 (판매자 주장)",
+        "evidence": [
+            {"id": "evidence-06", "kind": "video", "label": "GPU 작동 영상",
+             "summary": "10초 작동 영상: RGB 점등, 벤치마크 실행 화면 (데모 요약)."},
+            {"id": "evidence-07", "kind": "receipt", "label": "구매 영수증",
+             "summary": "카드 영수증 스캔: 상호는 보이나 구매 날짜 판독 불가."},
+        ],
+    },
+]

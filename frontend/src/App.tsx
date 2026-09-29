@@ -485,24 +485,40 @@ function LookBar({ look, setLook }: { look: LookId; setLook: (id: LookId) => voi
 }
 
 /** Shows the backend behind the dev/preview proxy when one answers; stays hidden on static hosting. */
+interface BackendHealth {
+  status?: string;
+  mode?: string;
+  contract_version?: string;
+  chain_mode?: string;
+  kiln?: { agent?: string; model_id?: string; api_key_configured?: boolean };
+  chain?: { chain_id?: number; contract_address?: string | null };
+}
+
 function BackendChip() {
-  const [info, setInfo] = useState<{ mode?: string; contract?: string } | null>(null);
+  const [info, setInfo] = useState<BackendHealth | null>(null);
   useEffect(() => {
     if (import.meta.env.VITE_BACKEND_PROBE === "off") return;
     const controller = new AbortController();
     fetch("/__backend/health", { signal: controller.signal, headers: { Accept: "application/json" } })
       .then((response) => (response.ok ? response.json() : null))
-      .then((data: { status?: string; mode?: string; contract_version?: string } | null) => {
-        if (data?.status === "ok") setInfo({ mode: data.mode, contract: data.contract_version });
+      .then((data: BackendHealth | null) => {
+        if (data?.status === "ok") setInfo(data);
       })
       .catch(() => undefined);
     return () => controller.abort();
   }, []);
   if (!info) return null;
+  const kiln = info.kiln?.agent === "kiln" && info.kiln.api_key_configured;
+  const chain = info.chain_mode === "live" && info.chain?.chain_id === 84532;
+  const parts = [info.mode ?? "on", kiln ? "Kiln" : null, chain ? "Base Sepolia" : null].filter(Boolean);
   return (
-    <span className="backend-chip" title={`백엔드 연결됨 · mode ${info.mode ?? "?"} · contract v${info.contract ?? "?"}`}>
-      <i /> 백엔드 {info.mode ?? "on"}
-      {info.contract ? ` · v${info.contract}` : ""}
+    <span
+      className={"backend-chip" + (kiln && chain ? " is-live" : "")}
+      title={`백엔드 연결됨 · mode ${info.mode ?? "?"} · chain ${info.chain_mode ?? "?"}`
+        + (info.kiln?.model_id ? ` · 모델 ${info.kiln.model_id}` : "")
+        + (info.chain?.contract_address ? ` · 컨트랙트 ${info.chain.contract_address}` : "")}
+    >
+      <i /> 백엔드 {parts.join(" · ")}
     </span>
   );
 }

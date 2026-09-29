@@ -66,6 +66,10 @@ class Settings:
     kiln_base_url: str = "https://api.bricksum.com/v1"
     kiln_model_id: str = "qwen3-32b"
     kiln_api_key: str = ""
+    kiln_timeout_seconds: float = 60.0
+    kiln_max_tokens: int = 1200
+    kiln_log_path: str = ""
+    kiln_thinking: bool = False
     chain_rpc_url: str = "https://sepolia.base.org"
     chain_id: int = 84532
     chain_explorer_url: str = "https://sepolia.basescan.org"
@@ -101,12 +105,16 @@ class Settings:
             app_origin=os.getenv("APP_ORIGIN", "http://localhost:5173").rstrip("/"),
             kiln_base_url=os.getenv("KILN_BASE_URL", "https://api.bricksum.com/v1").rstrip("/"),
             kiln_model_id=os.getenv("KILN_MODEL_ID", "qwen3-32b"),
-            kiln_api_key=os.getenv("KILN_API_KEY", ""),
+            kiln_api_key=os.getenv("KILN_API_KEY", "").strip(),
+            kiln_timeout_seconds=float(os.getenv("KILN_TIMEOUT_SECONDS", "60")),
+            kiln_max_tokens=int(os.getenv("KILN_MAX_TOKENS", "1200")),
+            kiln_log_path=os.getenv("KILN_LOG_PATH", str(ROOT / "data" / "kiln_calls.jsonl")),
+            kiln_thinking=_env_bool("KILN_THINKING", False),
             chain_rpc_url=os.getenv("CHAIN_RPC_URL", "https://sepolia.base.org"),
             chain_id=int(os.getenv("CHAIN_ID", "84532")),
             chain_explorer_url=os.getenv("CHAIN_EXPLORER_URL", "https://sepolia.basescan.org").rstrip("/"),
             contract_address=os.getenv("CONTRACT_ADDRESS", _deployed_contract()),
-            relayer_private_key=os.getenv("RELAYER_PRIVATE_KEY", ""),
+            relayer_private_key=os.getenv("RELAYER_PRIVATE_KEY", "").strip(),
             session_seconds=int(os.getenv("SESSION_SECONDS", "3600")),
             allow_demo_sessions=_env_bool("ALLOW_DEMO_SESSIONS", mode == "mock"),
             actors=actors,
