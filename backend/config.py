@@ -85,6 +85,14 @@ class Settings:
         mode = os.getenv("APP_MODE", "mock").strip().lower()
         actors: dict[str, dict[str, str]] = dict(DEFAULT_ACTORS)
         raw_actors = os.getenv("DEMO_ACTORS_JSON", "").strip()
+        buyer_wallet = os.getenv("DEMO_BUYER_WALLET", "").strip()
+        seller_wallet = os.getenv("DEMO_SELLER_WALLET", "").strip()
+        if not raw_actors and buyer_wallet and seller_wallet:
+            # Two browser-wallet accounts: one buyer, and one seller account shared by the three demo sellers.
+            raw_actors = json.dumps({
+                "buyer-demo": {"role": "buyer", "wallet_address": buyer_wallet},
+                **{f"seller-demo-{index}": {"role": "seller", "wallet_address": seller_wallet} for index in (1, 2, 3)},
+            })
         if raw_actors:
             parsed = json.loads(raw_actors)
             if not isinstance(parsed, dict):

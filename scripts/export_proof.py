@@ -23,6 +23,8 @@ sys.path.insert(0, str(ROOT))
 from backend.config import load_local_env  # noqa: E402
 
 DOCS = ROOT / "docs"
+# Stated assumption for a rough estimate; Kiln does not report energy. Change it if you have a better figure.
+ENERGY_WH_PER_1K_TOKENS = 0.3
 STEP_LABEL = {"assessment": "증빙 검토", "buyer_offer": "구매 제안", "seller_reply": "판매 응답", "buyer_reply": "구매 답변"}
 
 
@@ -78,6 +80,10 @@ def main() -> int:
         agreement = agreements.get(negotiation.get("agreement_id") or "", {})
         chain = agreement.get("chain") or {}
         flow_calls = [call for call in calls if call.get("flow_id") == flow_id]
+        events = [{"at": row[0], "actor": row[1], "event_type": row[2], "object_id": row[3], "reason_code": row[4]}
+                  for row in conn.execute("SELECT at, actor, event_type, object_id, reason_code FROM audit_events "
+                                          "WHERE flow_id=? ORDER BY at, rowid", (flow_id,))]
+        skipped = [event for event in events if event["event_type"] == "CANDIDATE_BLOCKED"]
         exported_calls += flow_calls
         verified = None
         if web3 and chain.get("tx_hash"):
@@ -103,6 +109,8 @@ def main() -> int:
                 "tx_hash": chain.get("tx_hash"), "block_number": chain.get("block_number"),
                 "receipt_status": chain.get("receipt_status"), "rpc_check": verified,
             } if agreement else None,
+            "events": events,
+            "skipped_candidates": [{"listing_id": event["object_id"], "reason_code": event["reason_code"]} for event in skipped],
             "kiln": {
                 "calls": len(flow_calls),
                 "ok": sum(1 for call in flow_calls if call.get("outcome") == "OK"),
@@ -136,7 +144,13 @@ def main() -> int:
             f"| {flow['kiln']['ok']}/{flow['kiln']['calls']} | ${flow['kiln']['cost_usd']:.6f} "
             f"| {agreement.get('status', flow['negotiation_status'])} {won(agreement.get('total_krw')) if agreement else ''} "
             f"| {f'[`{tx[:10]}…{tx[-6:]}`]({explorer}/tx/{tx})' if tx else '-'} |")
-    out += ["", f"Total Kiln cost for these flows: ${total_cost:.6f}", ""]
+    total_tokens = sum(flow["kiln"]["input_tokens"] + flow["kiln"]["output_tokens"] for flow in flows)
+    total_skipped = sum(len(flow["skipped_candidates"]) for flow in flows)
+    out += ["", f"- Total Kiln cost for these flows: ${total_cost:.6f} · {total_tokens:,} tokens",
+            f"- Model calls avoided: {total_skipped} candidate(s) failed the server's budget/deadline pre-check, so no "
+            "Kiln call was made for them (about 3 calls each: assessment, buyer offer, seller reply).",
+            f"- Energy (assumption, not a measurement): at {ENERGY_WH_PER_1K_TOKENS} Wh per 1,000 tokens, "
+            f"≈ {total_tokens / 1000 * ENERGY_WH_PER_1K_TOKENS:.2f} Wh for these flows.", ""]
     for flow in flows:
         agreement = flow["agreement"] or {}
         out += [f"## {flow['label']}", "",
@@ -144,6 +158,8 @@ def main() -> int:
                 f"- Buyer intent: `{json.dumps(flow['intent'], ensure_ascii=False)}`",
                 f"- Negotiation: {flow['negotiation_status']}"
                 + (f" · blocked: {', '.join(code for code in flow['blocked'] if code)}" if flow["blocked"] else ""),
+                "- Skipped before any model call: " + (", ".join(
+                    f"{item['listing_id']} ({item['reason_code']})" for item in flow["skipped_candidates"]) or "none"),
                 f"- Offers: " + (", ".join(f"{o['title'] or o['listing_id']} {won(o['total_krw'])} (round {o['round']})" for o in flow["offers"]) or "none")]
         if agreement:
             out += [f"- Agreement `{agreement['id']}` · {agreement['status']} · total {won(agreement['total_krw'])}",
@@ -161,6 +177,17 @@ def main() -> int:
                 f"| {call.get('cost_usd') if call.get('cost_usd') is not None else '-'} | {call.get('latency_ms')}ms | {call.get('outcome')} |")
         out.append("")
     (DOCS / "PROOF.md").write_text("\n".join(out), encoding="utf-8")
+    # Keep the README summary in sync: replace the block between the proof markers.
+    readme = ROOT / "README.md"
+    start, end = "<!-- proof:start -->", "<!-- proof:end -->"
+    text = readme.read_text(encoding="utf-8") if readme.exists() else ""
+    if start in text and end in text:
+        summary_start = out.index("## Summary") + 2
+        summary_end = next(i for i in range(summary_start, len(out)) if out[i].startswith("## "))
+        block = "\n".join([start, "", *out[summary_start:summary_end], "Full per-call log: [docs/PROOF.md](docs/PROOF.md)", "", end])
+        text = text[: text.index(start)] + block + text[text.index(end) + len(end):]
+        readme.write_text(text, encoding="utf-8")
+        print("updated README proof block")
     print(f"flows: {len(flows)} · kiln calls: {len(exported_calls)} · cost ${total_cost:.6f}")
     print("wrote docs/PROOF.md, docs/proof/flows.json, docs/proof/kiln_calls.jsonl")
     return 0

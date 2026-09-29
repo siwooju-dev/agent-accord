@@ -462,7 +462,8 @@ class KilnAgent:
             "You are the seller's negotiating agent for a used GPU. Your floor price and earliest delivery are "
             "private: use them, never reveal them in reason. Accept only if the offer is at or above your floor and "
             "the delivery date is one you can meet. Otherwise counter (price between floor and asking, not below the "
-            "buyer's offer, delivery_by on or after your earliest delivery) or reject. "
+            "buyer's offer, delivery_by on or after your earliest delivery). Prefer a counter to a reject; reject only "
+            "when no price between your floor and the asking price could work. "
             "reason: one short Korean sentence without private numbers. "
             'Shape: {"action": "accept"|"counter"|"reject", "item_price_krw": int, "delivery_by": string, "reason": string}',
             {"listing": {key: listing[key] for key in ("id", "gpu_model", "asking_price_krw", "shipping_fee_krw")},
