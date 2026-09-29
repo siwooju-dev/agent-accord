@@ -79,6 +79,17 @@ const reasonKo: Record<string, string> = {
   TOTAL_MISMATCH: "총액 불일치",
 };
 
+const FINISH_BY_LISTING: Record<string, "silver" | "black" | "white"> = {
+  "listing-01": "silver",
+  "listing-02": "black",
+  "listing-03": "white",
+};
+const variantOf = (item: Listing | undefined) => ({
+  fans: (item?.id === "listing-01" ? 2 : 3) as 2 | 3,
+  label: (item?.model ?? "RTX 4090").toUpperCase(),
+  finish: FINISH_BY_LISTING[item?.id ?? ""] ?? "white",
+});
+
 function App() {
   const [look, setLook] = useState<LookId>(readStoredLook);
   const [page, setPage] = useState<PageKey>("overview");
@@ -257,6 +268,28 @@ function App() {
   }
 
   const current = lookById(look);
+  const [shots, setShots] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    const palette = lookById(look).gpu;
+    import("./three/thumbnails")
+      .then((module) =>
+        module.renderGpuShots(
+          look,
+          palette,
+          DEMO_LISTINGS.map((item) => ({ key: item.id, variant: variantOf(item) })),
+        ),
+      )
+      .then((result) => {
+        if (alive) setShots(result);
+      })
+      .catch(() => {
+        /* no WebGL: the SVG illustration stays */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [look]);
   const hotspots: GpuHotspot[] = listing
     ? [
         ...DEMO_EVIDENCE.filter((item) => listing.evidenceIds.includes(item.id)).map(
@@ -325,10 +358,10 @@ function App() {
             setPage={setPage}
             gpu={
               <Suspense fallback={<div className="scene-loading">3D 모델 불러오는 중…</div>}>
-                <GpuScene palette={current.gpu} label={(listing?.model ?? "RTX 4090").toUpperCase()} hotspots={hotspots} />
+                <GpuScene palette={current.gpu} variant={variantOf(listing)} hotspots={hotspots} />
               </Suspense>
             }
-            listing={listing}
+            shots={shots}
           />
         )}
         {page === "conditions" && (
@@ -350,6 +383,7 @@ function App() {
             setSellerPrice={setSellerPrice}
             saveSeller={saveSeller}
             evaluations={evaluations}
+            shots={shots}
           />
         )}
         {page === "negotiation" && (
@@ -387,6 +421,7 @@ function App() {
             sign={sign}
             reject={reject}
             setPage={setPage}
+            shot={listing ? shots[listing.id] : undefined}
           />
         )}
         {page === "audit" && <Audit events={events} />}
@@ -549,7 +584,7 @@ function Overview({
   sellerSigned,
   setPage,
   gpu,
-  listing,
+  shots,
 }: {
   role: UserRole;
   intent: BuyerIntent;
@@ -561,222 +596,140 @@ function Overview({
   sellerSigned: boolean;
   setPage: (page: PageKey) => void;
   gpu: ReactNode;
-  listing: Listing | undefined;
+  shots: Record<string, string>;
 }) {
-  const valid = evaluations.filter((item) => item.status === "valid");
-  const lowest = valid.length ? Math.min(...valid.map((item) => item.offer.totalKrw)) : null;
-  const selected = evaluations.find((item) => item.offer.id === selectedId);
+  const valid = evaluations.filter((item) => item.status === "valid").length;
   return (
     <div className="overview">
       <section className="hero">
         <div className="hero-copy">
           <p className="hero-kicker">
-            <span className="hero-kicker-dot" /> 중고 GPU 거래 · AI 에이전트 협상
+            <span className="hero-kicker-dot" /> AI 에이전트 중고 GPU 거래
           </p>
           <h1 className="hero-title">
-            흥정은 <em>AI 에이전트</em>가,
+            흥정은 <em>AI</em>가,
             <br />
             결정은 <em className="alt">당신</em>이.
           </h1>
-          <p className="hero-lede">
-            구매·판매 에이전트가 가격을 주고받는 동안 서버가 예산과 배송 기한을 넘는 제안을 막아요. 두 사람이 같은 합의서에 서명해야 거래가 확정됩니다.
-          </p>
+          <p className="hero-lede">에이전트가 협상하고, 서버가 검사하고, 두 사람이 같은 합의서에 서명해요.</p>
           <div className="hero-cta">
             <button className="btn btn-primary" onClick={() => setPage("negotiation")}>
-              협상 보러 가기 <Icon name="arrow" size={15} />
+              협상 보기 <Icon name="arrow" size={16} />
             </button>
             <button className="btn btn-secondary" onClick={() => setPage("agreement")}>
               합의서 보기
             </button>
           </div>
-          <ul className="hero-trust">
-            <li>
-              <Icon name="shield" size={14} /> 서버 규칙 검사
-            </li>
-            <li>
-              <Icon name="lock" size={14} /> 비공개 한도 보호
-            </li>
-            <li>
-              <Icon name="agreement" size={14} /> 양측 서명
-            </li>
-          </ul>
         </div>
         <div className="hero-visual">
           <div className="hero-stage">{gpu}</div>
-          {selected && listing && (
-            <div className="float-card float-offer">
-              <span className="float-label">선택한 제안</span>
-              <b>
-                {listing.sellerName} · {listing.model.replace("RTX 4090 ", "")}
-              </b>
-              <strong>{money(selected.offer.totalKrw)}</strong>
-              <Verdict status={selected.status} sellerMode={role === "seller"} reason={selected.reasonCode} />
-            </div>
-          )}
-          <div className="float-card float-sign">
-            <span className="float-label">서명</span>
-            <div className="float-sign-row">
-              <span className={"sig buyer" + (buyerSigned ? " on" : "")}>구매자</span>
-              <span className="sig-line" />
-              <span className={"sig seller" + (sellerSigned ? " on" : "")}>판매자</span>
-            </div>
-            <StatusPill status={status} />
-          </div>
         </div>
       </section>
 
-      <section className="stats">
-        <div className="stat">
-          <span>조건을 통과한 제안</span>
-          <b>
-            {valid.length}
-            <small> / {evaluations.length}</small>
+      <section className="section">
+        <header className="section-head">
+          <h2>
+            받은 제안 <span className="count">{evaluations.length}</span>
+          </h2>
+          <span className="section-meta">
+            <span className="c-pass">{valid}개 조건 통과</span>
+            <button className="link-btn" onClick={() => setPage("negotiation")}>
+              협상 자세히 <Icon name="arrow" size={14} />
+            </button>
+          </span>
+        </header>
+        <div className="offer-grid">
+          {evaluations.map((item) => (
+            <OfferCard
+              key={item.offer.id}
+              evaluation={item}
+              active={item.offer.id === selectedId}
+              shot={shots[item.offer.listingId]}
+              onSelect={() => chooseOffer(item.offer.id)}
+              sellerMode={role === "seller"}
+            />
+          ))}
+          {role === "seller" && (
+            <div className="offer-hidden">
+              <Icon name="lock" size={18} />
+              <p>
+                <b>다른 판매자의 제안은 보이지 않아요</b>
+                판매자 화면에는 내 매물의 협상만 표시돼요.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="summary">
+        <div className="summary-item">
+          <span>
+            <Icon name="lock" size={14} /> {role === "buyer" ? "내 최고 총예산" : "내 매물"}
+          </span>
+          <b>{role === "buyer" ? money(intent.maxTotalKrw) : "RTX 4090 Gaming OC"}</b>
+        </div>
+        <div className="summary-item">
+          <span>
+            <Icon name="truck" size={14} /> 배송 기한
+          </span>
+          <b>{date(intent.deliveryDeadline)}까지</b>
+        </div>
+        <div className="summary-item">
+          <span>
+            <Icon name="pen" size={14} /> 서명
+          </span>
+          <b className="summary-sign">
+            <span className={"sig-dot buyer" + (buyerSigned ? " on" : "")}>구매자</span>
+            <span className={"sig-dot seller" + (sellerSigned ? " on" : "")}>판매자</span>
+            <StatusPill status={status} />
           </b>
         </div>
-        <div className="stat">
-          <span>가장 낮은 통과 제안</span>
-          <b>{lowest ? money(lowest) : "—"}</b>
-        </div>
-        <div className="stat">
-          <span>{role === "buyer" ? "내 예산까지 남은 금액" : "협상 라운드"}</span>
-          <b>{role === "buyer" ? (lowest ? money(intent.maxTotalKrw - lowest) : "—") : "2 / 3"}</b>
-        </div>
-        <div className="stat">
-          <span>체인 기록</span>
-          <b className="muted">대기 중</b>
-        </div>
+        <button className="btn btn-secondary small" onClick={() => setPage("conditions")}>
+          조건 수정
+        </button>
       </section>
-
-      <section className="how">
-        {[
-          { n: "1", t: "에이전트가 흥정해요", d: "구매자·판매자 에이전트가 각자의 비공개 한도 안에서 가격을 제안해요." },
-          { n: "2", t: "서버가 규칙으로 검사해요", d: "총액·예산·배송 기한·증빙을 코드로 확인하고 벗어난 제안은 막아요." },
-          { n: "3", t: "두 사람이 서명해요", d: "같은 합의서 해시에 양쪽이 서명해야 기록 단계로 넘어가요." },
-        ].map((step) => (
-          <div className="how-step" key={step.n}>
-            <span className="how-n">{step.n}</span>
-            <b>{step.t}</b>
-            <p>{step.d}</p>
-          </div>
-        ))}
-      </section>
-
-      <div className="overview-grid">
-        <Card
-          title="제안 목록"
-          sub="눌러서 합의서에 올릴 제안을 고르세요"
-          action={
-            <button className="link-btn" onClick={() => setPage("negotiation")}>
-              자세히 <Icon name="arrow" size={13} />
-            </button>
-          }
-        >
-          <OfferList evaluations={evaluations} selectedId={selectedId} choose={chooseOffer} sellerMode={role === "seller"} />
-        </Card>
-        <Card
-          title={role === "buyer" ? "내 구매 조건" : "내 판매 조건"}
-          sub="나에게만 보여요"
-          className="private-card"
-          action={
-            <button className="icon-btn" onClick={() => setPage("conditions")} aria-label="조건 수정">
-              <Icon name="conditions" size={16} />
-            </button>
-          }
-        >
-          {role === "buyer" ? (
-            <>
-              <div className="private-amount">
-                <span>
-                  <Icon name="lock" size={13} /> 최고 총예산
-                </span>
-                <b>{money(intent.maxTotalKrw)}</b>
-              </div>
-              <dl className="kv">
-                <div>
-                  <dt>GPU</dt>
-                  <dd>{intent.gpuModel}</dd>
-                </div>
-                <div>
-                  <dt>배송 기한</dt>
-                  <dd>{date(intent.deliveryDeadline)}까지</dd>
-                </div>
-                <div>
-                  <dt>필수 조건</dt>
-                  <dd className="chips">
-                    {intent.mustHave.map((item) => (
-                      <span className="chip" key={item}>
-                        {item}
-                      </span>
-                    ))}
-                  </dd>
-                </div>
-              </dl>
-            </>
-          ) : (
-            <>
-              <div className="private-amount seller">
-                <span>
-                  <Icon name="lock" size={13} /> 내 매물
-                </span>
-                <b>RTX 4090 Gaming OC</b>
-              </div>
-              <dl className="kv">
-                <div>
-                  <dt>판매자</dt>
-                  <dd>셀러 02 · demo</dd>
-                </div>
-                <div>
-                  <dt>최저가</dt>
-                  <dd>조건 화면에서 나만 볼 수 있어요</dd>
-                </div>
-              </dl>
-            </>
-          )}
-          <p className="note">
-            <Icon name="shield" size={13} /> 상대방의 비공개 한도는 표시하지 않아요.
-          </p>
-        </Card>
-      </div>
     </div>
   );
 }
 
-function OfferList({
-  evaluations,
-  selectedId,
-  choose,
-  sellerMode = false,
+function OfferCard({
+  evaluation,
+  active,
+  shot,
+  onSelect,
+  sellerMode,
 }: {
-  evaluations: Evaluation[];
-  selectedId: string;
-  choose: (id: string) => void;
-  sellerMode?: boolean;
+  evaluation: Evaluation;
+  active: boolean;
+  shot?: string;
+  onSelect: () => void;
+  sellerMode: boolean;
 }) {
+  const owner = DEMO_LISTINGS.find((entry) => entry.id === evaluation.offer.listingId);
   return (
-    <ul className="offer-list">
-      {evaluations.map((item) => {
-        const owner = DEMO_LISTINGS.find((entry) => entry.id === item.offer.listingId);
-        const active = item.offer.id === selectedId;
-        return (
-          <li key={item.offer.id}>
-            <button className={"offer-item" + (active ? " is-active" : "")} onClick={() => choose(item.offer.id)} aria-pressed={active}>
-              <span className="offer-avatar">{owner?.sellerName.slice(-2)}</span>
-              <span className="offer-main">
-                <b>{owner?.sellerName}</b>
-                <small>
-                  {owner?.model} · {item.offer.round}라운드 · {date(item.offer.deliveryBy)} 도착
-                </small>
-              </span>
-              <span className="offer-price">
-                <b>{money(item.offer.totalKrw)}</b>
-                <Verdict status={item.status} sellerMode={sellerMode} reason={item.reasonCode} />
-              </span>
-              <span className={"offer-radio" + (active ? " on" : "")} aria-hidden="true" />
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+    <button className={"offer-card" + (active ? " is-active" : "")} onClick={onSelect} aria-pressed={active}>
+      <span className="offer-shot">
+        {shot ? (
+          <img src={shot} alt="" />
+        ) : (
+          <GpuArt id={evaluation.offer.id} label={owner?.model ?? ""} fans={owner?.id === "listing-01" ? 2 : 3} />
+        )}
+        <span className={"offer-radio" + (active ? " on" : "")} aria-hidden="true" />
+      </span>
+      <span className="offer-body">
+        <span className="offer-seller">
+          {owner?.sellerName} · {evaluation.offer.round}라운드 {evaluation.offer.proposer === "buyer_agent" ? "구매 제안" : "반대 제안"}
+        </span>
+        <b className="offer-model">{owner?.model}</b>
+        <span className="offer-foot">
+          <strong>{money(evaluation.offer.totalKrw)}</strong>
+          <Verdict status={evaluation.status} sellerMode={sellerMode} reason={evaluation.reasonCode} />
+        </span>
+        <span className="offer-meta">
+          <Icon name="truck" size={14} /> {date(evaluation.offer.deliveryBy)} 도착 · 배송비 {money(evaluation.offer.shippingFeeKrw)}
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -800,6 +753,7 @@ function Conditions({
   setSellerPrice,
   saveSeller,
   evaluations,
+  shots,
 }: {
   role: UserRole;
   intent: BuyerIntent;
@@ -818,6 +772,7 @@ function Conditions({
   setSellerPrice: (value: string) => void;
   saveSeller: (event: FormEvent<HTMLFormElement>) => void;
   evaluations: Evaluation[];
+  shots: Record<string, string>;
 }) {
   const dirty =
     model.trim() !== intent.gpuModel ||
@@ -980,7 +935,7 @@ function Conditions({
           return (
             <article className="listing" key={item.id}>
               <div className="listing-art">
-                <GpuArt id={item.id} label={item.model} fans={item.id === "listing-01" ? 2 : 3} />
+                {shots[item.id] ? <img className="listing-shot" src={shots[item.id]} alt={`${item.model} 3D 렌더`} /> : <GpuArt id={item.id} label={item.model} fans={item.id === "listing-01" ? 2 : 3} />}
                 {!hidden && evaluation && (
                   <span className="listing-verdict">
                     <Verdict status={evaluation.status} reason={evaluation.reasonCode} />
@@ -1211,6 +1166,7 @@ function Agreement({
   sign,
   reject,
   setPage,
+  shot,
 }: {
   role: UserRole;
   listing: Listing | undefined;
@@ -1234,6 +1190,7 @@ function Agreement({
   sign: () => void;
   reject: () => void;
   setPage: (page: PageKey) => void;
+  shot?: string;
 }) {
   const valid = evaluation?.status === "valid";
   const detail =
@@ -1294,6 +1251,11 @@ function Agreement({
       ) : (
         <div className="split">
           <section className="card doc">
+            {shot && (
+              <div className="doc-shot">
+                <img src={shot} alt={`${snapshot.model} 3D 렌더`} />
+              </div>
+            )}
             <header className="doc-head">
               <div>
                 <p className="eyebrow">합의서 · {snapshot.agreementId}</p>

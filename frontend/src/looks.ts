@@ -18,6 +18,9 @@ export interface GpuPalette {
   fins: number;
   shadow: string;
   exposure: number;
+  envIntensity: number;
+  rimIntensity: number;
+  groundShadow: number;
 }
 
 export interface Look {
@@ -55,6 +58,9 @@ export const LOOKS: Look[] = [
       fins: 0xd5dde7,
       shadow: "rgba(49, 102, 180, 0.34)",
       exposure: 1.05,
+      envIntensity: 1,
+      rimIntensity: 0.6,
+      groundShadow: 0.16,
     },
   },
   {
@@ -81,6 +87,9 @@ export const LOOKS: Look[] = [
       fins: 0xe8e2fb,
       shadow: "rgba(109, 74, 255, 0.32)",
       exposure: 1.1,
+      envIntensity: 1.1,
+      rimIntensity: 0.9,
+      groundShadow: 0.14,
     },
   },
   {
@@ -107,6 +116,9 @@ export const LOOKS: Look[] = [
       fins: 0x6b707a,
       shadow: "rgba(0, 0, 0, 0.7)",
       exposure: 0.95,
+      envIntensity: 0.55,
+      rimIntensity: 1.8,
+      groundShadow: 0.45,
     },
   },
   {
@@ -133,6 +145,9 @@ export const LOOKS: Look[] = [
       fins: 0xc4c4be,
       shadow: "rgba(40, 40, 36, 0.38)",
       exposure: 1,
+      envIntensity: 0.9,
+      rimIntensity: 0.4,
+      groundShadow: 0.22,
     },
   },
 ];

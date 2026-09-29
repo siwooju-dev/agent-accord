@@ -232,9 +232,6 @@
   filter: blur(46px);
   animation: aurora-drift 14s ease-in-out infinite alternate;
 }
-[data-look="aurora"] .float-offer { left: 2%; top: 22%; }
-[data-look="aurora"] .float-sign { right: 2%; bottom: 18%; }
-[data-look="aurora"] .how-n { background: var(--btn-primary-bg); }
 [data-look="aurora"] .page-head { text-align: center; }
 [data-look="aurora"] .page-head .eyebrow { justify-content: center; }
 [data-look="aurora"] .page-head h1 { font-size: clamp(32px, 4vw, 52px); }
@@ -461,13 +458,14 @@
 [data-look="studio"] .eyebrow { color: var(--fg); font-size: 12.5px; }
 [data-look="studio"] .how-n { color: #111; }
 [data-look="studio"] .card-head h2, [data-look="studio"] .section-title h2, [data-look="studio"] .doc-head h2 { letter-spacing: -0.03em; }
-[data-look="studio"] .stat b:not(.muted), [data-look="studio"] .float-card strong, [data-look="studio"] .doc-total strong { font-family: var(--font-mono); letter-spacing: -0.04em; font-weight: 800; }
+[data-look="studio"] .stat b:not(.muted), [data-look="studio"] .offer-foot strong, [data-look="studio"] .doc-total strong { font-family: var(--font-mono); letter-spacing: -0.04em; font-weight: 800; }
 [data-look="studio"] .btn-primary { box-shadow: 3px 3px 0 #ff5a1f; }
 [data-look="studio"] .btn-primary:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 #ff5a1f; filter: none; }
-[data-look="studio"] .listing:hover, [data-look="studio"] .offer-item:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 #111; }
-[data-look="studio"] .offer-item { border: 1.5px solid #111; background: #fff; }
-[data-look="studio"] .offer-item.is-active { border-color: #111; background: #ffe1d3; box-shadow: 4px 4px 0 #111; }
-[data-look="studio"] .offer-radio.on { border-color: #111; }
+[data-look="studio"] .listing:hover, [data-look="studio"] .offer-card:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 #111; }
+[data-look="studio"] .offer-card.is-active { box-shadow: 0 0 0 3px #ff5a1f, 6px 6px 0 #111; }
+[data-look="studio"] .offer-radio { border-color: #111; }
+[data-look="studio"] .offer-radio.on { border-color: #ff5a1f; }
+[data-look="studio"] .offer-shot { border-bottom: 1.5px solid #111; }
 [data-look="studio"] .pill { box-shadow: inset 0 0 0 1.5px currentColor; }
 [data-look="studio"] .role-chip, [data-look="studio"] .chip { box-shadow: inset 0 0 0 1.5px currentColor; }
 [data-look="studio"] .steps li { background: #fff; box-shadow: inset 0 0 0 1.5px rgba(17, 17, 17, 0.2); }
