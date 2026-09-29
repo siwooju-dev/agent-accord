@@ -108,7 +108,7 @@ export default function LiveApp() {
   const agreementHash = agreement?.snapshot_hash;
   const agreementStatus = agreement?.status;
   useEffect(() => {
-    if (!session || !agreementId || !agreementHash || !agreementStatus || ["RECORDED", "CHAIN_FAILED", "REJECTED", "EXPIRED"].includes(agreementStatus)) return;
+    if (!session || !agreementId || !agreementHash || !agreementStatus || ["RECORDED", "MOCK_RECORDED", "CHAIN_FAILED", "REJECTED", "EXPIRED"].includes(agreementStatus)) return;
     const controller = new AbortController();
     let timer: number;
     const poll = async () => {

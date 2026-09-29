@@ -8,6 +8,8 @@ export type FlowStatus =
   | "AWAITING_APPROVALS"
   | "RECORDING"
   | "RECORDED"
+  /** local mock chain: both signatures stored, nothing broadcast */
+  | "MOCK_RECORDED"
   | "NO_MATCH"
   | "BLOCKED"
   | "REJECTED"

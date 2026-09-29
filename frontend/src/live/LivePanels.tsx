@@ -166,7 +166,7 @@ export function AgreementPanel({ agreement, payload, session, wallet, blockReaso
   return <section className="live-card">
     <div className="live-card-head"><h2>합의안 · 승인</h2><button type="button" disabled={busy} onClick={() => void onRefresh()}>상태 새로고침</button></div>
     <div className={`live-state ${recorded ? "success" : ""}`} role="status">
-      <b>{recorded ? "체인 기록 확인" : agreement.status === "RECORDED" ? "체인 증거 불일치" : agreement.status}</b>
+      <b>{recorded ? "체인 기록 확인" : agreement.status === "RECORDED" ? "체인 증거 불일치" : agreement.status === "MOCK_RECORDED" ? "양측 서명 완료 · mock 기록 (체인 전송 없음)" : agreement.status}</b>
       <span>구매자 {agreement.buyer_approved ? "승인" : "대기"} · 판매자 {agreement.seller_approved ? "승인" : "대기"}</span>
     </div>
     <div className="live-subcard live-snapshot">
