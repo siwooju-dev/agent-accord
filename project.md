@@ -95,7 +95,7 @@ MVP 배포 대상은 **Base Sepolia**다. chain ID `84532`, 기본 공개 RPC `h
 7. 백엔드와 기록 계약이 양측 서명을 검증한다. 서버의 relayer 지갑이 실제 테스트넷 트랜잭션을 제출한다.
 8. 성공 영수증, 이벤트, 계약 조회값과 오프체인 합의 해시를 대조한 뒤 `RECORDED`로 표시한다. 실패는 `CHAIN_FAILED`로 남긴다.
 
-상태: `DRAFT → NEGOTIATING → PROPOSED → AWAITING_APPROVALS → RECORDING → RECORDED`. 종료 상태: `NO_MATCH`, `BLOCKED`, `REJECTED`, `EXPIRED`, `CHAIN_FAILED`. 한 합의는 최대 한 번 기록된다.
+상태: 실제 테스트넷 흐름은 `DRAFT → NEGOTIATING → PROPOSED → AWAITING_APPROVALS → RECORDING → RECORDED`. 로컬 mock 흐름은 `AWAITING_APPROVALS → MOCK_RECORDED`로 끝나며 온체인 기록을 뜻하지 않는다. 종료 상태: `NO_MATCH`, `BLOCKED`, `REJECTED`, `EXPIRED`, `CHAIN_FAILED`. 한 합의는 최대 한 번 기록된다.
 
 ## 서명·온체인 기록의 의미
 

@@ -38,7 +38,7 @@
 | `Evidence` | `id`, `kind`, `source`, `ref`, `sha256`, `verification_status` | `seller_claimed/checked/conflicted/unknown`; 해시와 원본 참조를 유지 |
 | `ListingAssessment` | `flow_id`, `listing_id`, `summary`, `findings[]`, `source` | `source=kiln/mock`; 각 finding은 `evidence_id: string|null`, `verdict: consistent/conflicted/unverified`, `note: string` |
 | `Offer` | `id`, `negotiation_id`, `listing_id`, `round`, `proposer`, `item_price_krw`, `shipping_fee_krw`, `total_krw`, `delivery_by`, `warranty_terms`, `expires_at`, `evidence_ids`, `rationale`, `valid` | `rationale`은 공개 가능한 협상 이유; 서버가 총액과 조건을 재계산·검사한 후 `valid=true`만 승인 가능 |
-| `ModelUsage` | `actor`, `step`, `model_id`, `request_id`, `input_tokens`, `output_tokens`, `latency_ms`, `source` | `request_id`는 Kiln의 `X-Neocloud-Generation-Id` 헤더 값; `source=api/estimated`로 실제/추정 구분 |
+| `ModelUsage` | `actor`, `step`, `model_id`, `request_id`, `input_tokens`, `output_tokens`, `latency_ms`, `source` | `request_id`는 Kiln의 `X-Neocloud-Generation-Id` 헤더 값; `source=api/estimated/unavailable`로 실제/추정/미수집 구분 |
 
 MVP 수수료는 `0 KRW`다. 따라서 `total_krw = item_price_krw + shipping_fee_krw`이다. 수수료가 생기면 제안·스냅샷·정책 검사 필드를 함께 버전 변경한다. 서버 검사는 총액이 구매자 예산 이하, 상품가가 해당 판매자 최저가 이상, 제안 배송 시각이 판매자의 `earliest_delivery_at` 이상이면서 구매자 기한 이하, 재고와 필수 조건이 유효한지 확인한다. `warranty_active`는 입력된 보증 만료일 검사이며 보증의 진위를 뜻하지 않는다. AI의 계산값만 신뢰하지 않는다.
 
@@ -143,8 +143,9 @@ MVP 수수료는 `0 KRW`다. 따라서 `total_krw = item_price_krw + shipping_fe
 | 제출/확정 대기 | `mode: testnet`, `chain_id`, `tx_hash`, `receipt_status: pending` |
 | 확정 성공 | 위 필드와 `receipt_status: success`, `block_number`, `event_name: AgreementRecorded`, `recorded_hash`; 이벤트와 `getAgreement`의 해시·당사자·총액·nonce 일치 |
 | 실패 | `receipt_status: failed`, `reason_code: CHAIN_FAILED`; `RECORDED`로 표시 금지 |
+| 로컬 mock 완료 | `mode: mock`, `tx_hash: null`, `receipt_status: null`; 합의 상태는 `MOCK_RECORDED`이며 실제 트랜잭션은 제출하지 않음 |
 
-mock 체인을 쓴 로컬 테스트라면 `mode=mock`, `tx_hash=null`로 표시한다. 실제 영수증·이벤트·계약 조회값이 합의 해시와 일치한 후에만 상태를 `RECORDED`로 바꾼다.
+mock 체인을 쓴 로컬 테스트는 양측 EIP-712 서명을 검증하더라도 `MOCK_RECORDED`로 표시한다. 실제 영수증·이벤트·계약 조회값이 합의 해시와 일치한 경우에만 상태를 `RECORDED`로 바꾼다.
 
 ### 4.8 `GET /api/agreements/{id}/approval-payload`
 
@@ -194,9 +195,10 @@ EIP-712 타입 문자열은 `AgreementApproval(bytes32 agreementHash,address buy
 ## 6. 상태·전이
 
 - 협상: `DRAFT → NEGOTIATING → PROPOSED → AWAITING_APPROVALS`; 유효 후보가 없거나 모든 제안이 차단되면 `NO_MATCH/BLOCKED`로 끝난다.
-- 합의: `AWAITING_APPROVALS → RECORDING → RECORDED`. 한쪽 거절은 `REJECTED`, 만료는 `EXPIRED`, 영수증/이벤트 확인 실패는 `CHAIN_FAILED`다.
+- 합의: 실제 테스트넷에서는 `AWAITING_APPROVALS → RECORDING → RECORDED`; 로컬 mock에서는 `AWAITING_APPROVALS → MOCK_RECORDED`다. 한쪽 거절은 `REJECTED`, 만료는 `EXPIRED`, 영수증/이벤트 확인 실패는 `CHAIN_FAILED`다.
 - 제안 내용·금액·배송·증빙 해시가 바뀌면 **새 `Agreement`/해시/nonce**를 만들고 이전 서명을 재사용하지 않는다.
 - `RECORDED`는 실제 테스트넷 영수증 성공과 `AgreementRecorded` 이벤트/계약 상태 대조를 모두 완료한 경우만 쓴다. AI가 낸 제안이나 양측 웹 승인만으로 거래 성공으로 표시하지 않는다.
+- `MOCK_RECORDED`는 로컬 mock 모드의 API 서명 검증 완료를 가리키며 체인 기록 증거가 아니다.
 
 ## 7. 오류 형식과 HTTP 상태
 
