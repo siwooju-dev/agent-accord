@@ -214,16 +214,16 @@ export function AgreementPanel({ agreement, payload, session, wallet, blockReaso
 }
 
 export function AuditPanel({ audit, busy, onRefresh }: { audit: Audit | null; busy: boolean; onRefresh: () => Promise<void> }) {
-  const usage = audit?.model_usage.reduce((sum, item) => ({
-    input: sum.input + item.input_tokens,
-    output: sum.output + item.output_tokens,
-  }), { input: 0, output: 0 });
+  const tokenTotal = (value: unknown) =>
+    typeof value === "number" && Number.isSafeInteger(value) ? value : "미수집";
   return <section className="live-card"><div className="live-card-head"><h2>흐름 감사</h2><button type="button" disabled={busy} onClick={() => void onRefresh()}>감사 조회</button></div>
     {!audit ? <p className="live-empty">흐름을 시작하거나 합의안을 선택한 뒤 조회하세요.</p> : <>
       <p>{audit.flow_id} · {audit.status}</p>
       <ul className="live-audit">{audit.events.map((event, index) => <li key={`${event.at}-${index}`}><time>{when(event.at)}</time><b>{event.event_type}</b><span>{event.actor} · {event.decision ?? "-"} · {event.reason_code ?? "-"}</span></li>)}</ul>
-      <h3>모델 사용량</h3><ul>{audit.model_usage.map((usage, index) => <li key={`${usage.request_id}-${index}`}>{usage.actor} / {usage.step} · {usage.model_id} · 입력 {usage.input_tokens}, 출력 {usage.output_tokens} 토큰 · {usage.source}</li>)}</ul>
-      <p>표시된 모델 사용량: {audit.model_usage.length}건 · 입력 {usage?.input ?? 0}토큰 · 출력 {usage?.output ?? 0}토큰</p>
+      <h3>모델 사용량</h3>{audit.model_usage.length > 0
+        ? <ul>{audit.model_usage.map((usage, index) => <li key={`${usage.request_id ?? usage.step}-${index}`}>{usage.actor} / {usage.step} · {usage.model_id} · 입력 {usage.input_tokens ?? "미수집"}, 출력 {usage.output_tokens ?? "미수집"} 토큰 · {usage.source}</li>)}</ul>
+        : <p>{audit.totals.usage_source === "mock" ? "로컬 mock 에이전트는 Kiln API를 호출하지 않았습니다." : "확인 가능한 모델 사용량 기록이 없습니다."}</p>}
+      <p>모델 사용량 기록: {audit.model_usage.length}건 · 입력 {tokenTotal(audit.totals.input_tokens)}토큰 · 출력 {tokenTotal(audit.totals.output_tokens)}토큰</p>
     </>}
   </section>;
 }

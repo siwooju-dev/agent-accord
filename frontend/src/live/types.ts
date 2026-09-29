@@ -205,11 +205,11 @@ export interface ModelUsage {
   actor: string;
   step: string;
   model_id: string;
-  request_id: string;
-  input_tokens: number;
-  output_tokens: number;
+  request_id: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
   latency_ms: number;
-  source: "api" | "estimated";
+  source: "api" | "estimated" | "unavailable";
 }
 
 export interface Audit {
