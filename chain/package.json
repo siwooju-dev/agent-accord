@@ -1,1 +1,0 @@
-{"name":"dealbattle-contracts","private":true,"type":"module","scripts":{"compile":"node compile.mjs"},"devDependencies":{"solc":"0.8.28"},"overrides":{"tmp":"0.2.7"}}
