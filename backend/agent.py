@@ -428,6 +428,9 @@ class KilnAgent:
             if action not in {"accept", "counter", "reject"}:
                 raise AgentError("INVALID_MODEL_OUTPUT", detail="action must be accept|counter|reject")
             reason = result.get("reason") if isinstance(result.get("reason"), str) else ""
+            if action == "reject" and offered >= floor * 0.85:
+                raise AgentError("INVALID_MODEL_OUTPUT",
+                                 detail="the offer is close to your floor: counter instead of rejecting")
             if action == "reject":
                 return {"action": "reject", "item_price_krw": offered, "delivery_by": offered_delivery,
                         "reason": reason.strip()[:300]}
