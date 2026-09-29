@@ -1,0 +1,191 @@
+{
+  "dataset_id": "gpu-demo-v1",
+  "dataset_label": "demo/synthetic",
+  "notice": "모든 매물, 가격, 판매자, 증빙 내용은 시연용으로 임의 생성되었습니다. 실제 판매 기록, 공식 시세, 실물 검증을 나타내지 않습니다.",
+  "currency": "KRW",
+  "reference_time_utc": "2026-09-29T00:00:00Z",
+  "buyer_intents": [
+    {
+      "id": "intent-base",
+      "buyer_id": "buyer-demo-01",
+      "gpu_model": "RTX 4080",
+      "max_total_krw": 1350000,
+      "delivery_deadline": "2026-10-06T23:59:59Z",
+      "must_have": [],
+      "scenario": "기본 조건"
+    },
+    {
+      "id": "intent-budget-low",
+      "buyer_id": "buyer-demo-01",
+      "gpu_model": "RTX 4080",
+      "max_total_krw": 1150000,
+      "delivery_deadline": "2026-10-06T23:59:59Z",
+      "must_have": [],
+      "scenario": "예산 감소"
+    },
+    {
+      "id": "intent-deadline-short",
+      "buyer_id": "buyer-demo-01",
+      "gpu_model": "RTX 4080",
+      "max_total_krw": 1350000,
+      "delivery_deadline": "2026-10-03T23:59:59Z",
+      "must_have": [],
+      "scenario": "배송 기한 단축"
+    }
+  ],
+  "seller_policies_private": [
+    {
+      "id": "policy-seller-01",
+      "seller_id": "seller-demo-01",
+      "listing_id": "listing-01",
+      "min_item_price_krw": 1050000,
+      "earliest_delivery_at": "2026-10-02T00:00:00Z"
+    },
+    {
+      "id": "policy-seller-02",
+      "seller_id": "seller-demo-02",
+      "listing_id": "listing-02",
+      "min_item_price_krw": 1000000,
+      "earliest_delivery_at": "2026-10-05T00:00:00Z"
+    },
+    {
+      "id": "policy-seller-03",
+      "seller_id": "seller-demo-03",
+      "listing_id": "listing-03",
+      "min_item_price_krw": 1200000,
+      "earliest_delivery_at": "2026-10-01T00:00:00Z"
+    }
+  ],
+  "listings": [
+    {
+      "id": "listing-01",
+      "seller_id": "seller-demo-01",
+      "gpu_model": "RTX 4080",
+      "asking_price_krw": 1180000,
+      "shipping_fee_krw": 10000,
+      "condition_text": "가상 데모 매물. 사용 기간과 작동 상태는 판매자 주장으로, 별도 확인되지 않음.",
+      "warranty_end": "2026-12-31",
+      "stock_status": "available",
+      "stock_quantity": 1,
+      "evidence_ids": ["evidence-01a"],
+      "data_label": "demo/synthetic",
+      "description_version": 1,
+      "description_updated_at": "2026-09-29T00:00:00Z"
+    },
+    {
+      "id": "listing-02",
+      "seller_id": "seller-demo-02",
+      "gpu_model": "RTX 4080",
+      "asking_price_krw": 1100000,
+      "shipping_fee_krw": 0,
+      "condition_text": "가상 데모 매물. 판매자는 보증이 없다고 설명함.",
+      "warranty_end": null,
+      "stock_status": "available",
+      "stock_quantity": 1,
+      "evidence_ids": ["evidence-02a", "evidence-02b"],
+      "data_label": "demo/synthetic",
+      "description_version": 1,
+      "description_updated_at": "2026-09-29T00:00:00Z"
+    },
+    {
+      "id": "listing-03",
+      "seller_id": "seller-demo-03",
+      "gpu_model": "RTX 4080",
+      "asking_price_krw": 1270000,
+      "shipping_fee_krw": 0,
+      "condition_text": "가상 데모 매물. 판매자는 보증 기간이 남아 있다고 설명함.",
+      "warranty_end": "2027-03-31",
+      "stock_status": "available",
+      "stock_quantity": 2,
+      "evidence_ids": ["evidence-03a"],
+      "data_label": "demo/synthetic",
+      "description_version": 1,
+      "description_updated_at": "2026-09-29T00:00:00Z"
+    }
+  ],
+  "evidences": [
+    {
+      "id": "evidence-01a",
+      "listing_id": "listing-01",
+      "kind": "seller_condition_note",
+      "source": "demo/synthetic",
+      "ref": "synthetic://gpu-demo-v1/listing-01/condition-note",
+      "sha256": null,
+      "uploaded_by": "seller-demo-01",
+      "uploaded_at": "2026-09-29T00:00:00Z",
+      "verification_status": "seller_claimed",
+      "verification_method": null,
+      "verified_by": null,
+      "note": "가상 설명 카드이며 실물 확인 자료가 아님."
+    },
+    {
+      "id": "evidence-02a",
+      "listing_id": "listing-02",
+      "kind": "seller_warranty_claim",
+      "source": "demo/synthetic",
+      "ref": "synthetic://gpu-demo-v1/listing-02/seller-description",
+      "sha256": null,
+      "uploaded_by": "seller-demo-02",
+      "uploaded_at": "2026-09-29T00:00:00Z",
+      "verification_status": "conflicted",
+      "verification_method": null,
+      "verified_by": null,
+      "note": "판매자 설명은 보증 없음. 다른 가상 증빙 카드와 내용이 다름."
+    },
+    {
+      "id": "evidence-02b",
+      "listing_id": "listing-02",
+      "kind": "synthetic_warranty_card",
+      "source": "demo/synthetic",
+      "ref": "synthetic://gpu-demo-v1/listing-02/warranty-card",
+      "sha256": null,
+      "uploaded_by": "seller-demo-02",
+      "uploaded_at": "2026-09-29T00:00:00Z",
+      "verification_status": "conflicted",
+      "verification_method": null,
+      "verified_by": null,
+      "note": "가상 카드에는 보증 종료일 2026-11-30으로 기재되어 설명과 충돌함. 실제 보증 확인 자료가 아님."
+    },
+    {
+      "id": "evidence-03a",
+      "listing_id": "listing-03",
+      "kind": "seller_warranty_claim",
+      "source": "demo/synthetic",
+      "ref": "synthetic://gpu-demo-v1/listing-03/warranty-note",
+      "sha256": null,
+      "uploaded_by": "seller-demo-03",
+      "uploaded_at": "2026-09-29T00:00:00Z",
+      "verification_status": "seller_claimed",
+      "verification_method": null,
+      "verified_by": null,
+      "note": "가상 판매자 주장. 별도 확인되지 않음."
+    }
+  ],
+  "scenario_expectations": [
+    {
+      "intent_id": "intent-base",
+      "expected_candidate_listing_ids": ["listing-01", "listing-02", "listing-03"],
+      "expected_listed_price_budget_pass_listing_ids": ["listing-01", "listing-02", "listing-03"],
+      "notes": "검색 조건(모델, 재고, 배송 기한)을 만족하는 후보 3개. 현재 제시 총액 기준 모두 예산 이내다. listing-02 증빙 충돌은 별도 표시하며, 실제 제안은 서버가 비공개 정책과 모든 조건을 다시 검증한다."
+    },
+    {
+      "intent_id": "intent-budget-low",
+      "expected_candidate_listing_ids": ["listing-01", "listing-02", "listing-03"],
+      "expected_listed_price_budget_pass_listing_ids": ["listing-02"],
+      "notes": "기본 검색 조건(모델, 재고, 배송 기한)만 적용하면 후보는 3개다. 현재 제시 총액 기준 예산 1,150,000 KRW 이내인 매물은 listing-02뿐이다. 협상 제안은 별도로 서버가 총액과 비공개 정책을 검증한다. listing-02 증빙 충돌은 별도 표시한다."
+    },
+    {
+      "intent_id": "intent-deadline-short",
+      "expected_candidate_listing_ids": ["listing-01", "listing-03"],
+      "expected_listed_price_budget_pass_listing_ids": ["listing-01", "listing-03"],
+      "notes": "배송 마감 2026-10-03 조건에서 listing-02는 배송 가능일이 늦어 검색 후보에서 제외한다. 나머지 두 매물은 현재 제시 총액 기준 예산 이내다."
+    }
+  ],
+  "runtime_records": {
+    "offers": [],
+    "agreements": [],
+    "audit_events": [],
+    "model_usage": [],
+    "note": "실행 결과, 승인, 체인 영수증, 토큰 사용량은 실제 데모 실행 시 생성하므로 미리 꾸며 넣지 않는다."
+  }
+}
