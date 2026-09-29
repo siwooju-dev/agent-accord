@@ -1,0 +1,360 @@
+[
+  {
+    "flow_id": "flow-509a385b99244e38",
+    "label": "A · 기본 조건",
+    "signed_by": "MetaMask in the web UI",
+    "started_at": "2026-09-29T13:30:46Z",
+    "intent": {
+      "gpu_model": "RTX 4090",
+      "max_total_krw": 2400000,
+      "delivery_deadline": "2026-10-09T13:30:00Z",
+      "must_have": [
+        "evidence_present"
+      ]
+    },
+    "negotiation_status": "AWAITING_APPROVALS",
+    "blocked": [
+      "BUYER_REJECTED_COUNTER",
+      "BUYER_AGENT_SKIPPED"
+    ],
+    "offers": [
+      {
+        "listing_id": "listing-demo-3",
+        "title": "ROG Strix RTX 4090",
+        "round": 2,
+        "total_krw": 2105000
+      }
+    ],
+    "agreement": {
+      "id": "agreement-79e17c9a6e164093",
+      "status": "RECORDED",
+      "listing_id": "listing-demo-3",
+      "total_krw": 2105000,
+      "snapshot_hash": "0x45434e6e903ccbb33ed7eb996fbfbd7d9352cdf209a2e95b5107301ab5059e52",
+      "buyer_wallet": "0xc96adf4a4014bb096f77d8e658f10a2c280c47b7",
+      "seller_wallet": "0x7429b5764dffecbfcc90f48413f77e363fcb6530",
+      "tx_hash": "0x10afa7beea789bb553967366342599273839c29536e641eacc1b1851fc616ec2",
+      "block_number": 47462235,
+      "receipt_status": "success",
+      "rpc_check": {
+        "status": 1,
+        "block_number": 47462235,
+        "to": "0x265756b7d5C4CeEd6976F87E54E44ED0921ac013",
+        "logs": 1
+      }
+    },
+    "events": [
+      {
+        "at": "2026-09-29T13:30:46Z",
+        "actor": "buyer-demo",
+        "event_type": "NEGOTIATION_STARTED",
+        "object_id": "neg-eb589e2463974439",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T13:30:55Z",
+        "actor": "buyer-agent",
+        "event_type": "COUNTER_REJECTED",
+        "object_id": "listing-demo-1",
+        "reason_code": "BUYER_REJECTED_COUNTER"
+      },
+      {
+        "at": "2026-09-29T13:30:59Z",
+        "actor": "buyer-agent",
+        "event_type": "LISTING_SKIPPED",
+        "object_id": "listing-demo-2",
+        "reason_code": "BUYER_AGENT_SKIPPED"
+      },
+      {
+        "at": "2026-09-29T13:31:07Z",
+        "actor": "server",
+        "event_type": "OFFER_ALLOWED",
+        "object_id": "listing-demo-3",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T13:31:07Z",
+        "actor": "server",
+        "event_type": "AGREEMENT_CREATED",
+        "object_id": "agreement-79e17c9a6e164093",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T13:34:44Z",
+        "actor": "buyer-demo",
+        "event_type": "AGREEMENT_APPROVED",
+        "object_id": "agreement-79e17c9a6e164093",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:39:13Z",
+        "actor": "seller-demo-3",
+        "event_type": "AGREEMENT_APPROVED",
+        "object_id": "agreement-79e17c9a6e164093",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:39:16Z",
+        "actor": "chain",
+        "event_type": "CHAIN_PENDING",
+        "object_id": "agreement-79e17c9a6e164093",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:39:21Z",
+        "actor": "chain",
+        "event_type": "AGREEMENT_RECORDED",
+        "object_id": "agreement-79e17c9a6e164093",
+        "reason_code": null
+      }
+    ],
+    "skipped_candidates": [],
+    "kiln": {
+      "calls": 12,
+      "ok": 10,
+      "input_tokens": 5103,
+      "output_tokens": 1067,
+      "cost_usd": 0.00063552
+    }
+  },
+  {
+    "flow_id": "flow-d3c9de1012d643ea",
+    "label": "B · 예산 감소",
+    "signed_by": "local test wallets via scripts/run_flows.py",
+    "started_at": "2026-09-29T14:42:01Z",
+    "intent": {
+      "gpu_model": "RTX 4090",
+      "max_total_krw": 2000000,
+      "delivery_deadline": "2026-10-09T14:42:01Z",
+      "must_have": [
+        "evidence_present"
+      ]
+    },
+    "negotiation_status": "AWAITING_APPROVALS",
+    "blocked": [
+      "BUDGET_EXCEEDED",
+      "BUDGET_EXCEEDED"
+    ],
+    "offers": [
+      {
+        "listing_id": "listing-demo-1",
+        "title": "RTX 4090 Founders Edition",
+        "round": 1,
+        "total_krw": 1920000
+      }
+    ],
+    "agreement": {
+      "id": "agreement-a2b89ccf5226477b",
+      "status": "RECORDED",
+      "listing_id": "listing-demo-1",
+      "total_krw": 1920000,
+      "snapshot_hash": "0xfda1d3fb6ce39f5b3f9fcc0213e1e12be38a4374e1bf65bacd0f57060c3467ed",
+      "buyer_wallet": "0x94fc747198f989d2852bd35cd9f38dafa927b855",
+      "seller_wallet": "0x0887deebfa7451b41ab911f75f600534095e581e",
+      "tx_hash": "0x8dbadc1998fb60276992c5a53c23bd746edd4577265d5a84a9e64c830d804919",
+      "block_number": 47462323,
+      "receipt_status": "success",
+      "rpc_check": {
+        "status": 1,
+        "block_number": 47462323,
+        "to": "0x265756b7d5C4CeEd6976F87E54E44ED0921ac013",
+        "logs": 1
+      }
+    },
+    "events": [
+      {
+        "at": "2026-09-29T14:42:01Z",
+        "actor": "buyer-demo",
+        "event_type": "NEGOTIATION_STARTED",
+        "object_id": "neg-94e3c9a5cbbb4e1a",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:42:08Z",
+        "actor": "server",
+        "event_type": "OFFER_ALLOWED",
+        "object_id": "listing-demo-1",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:42:08Z",
+        "actor": "server",
+        "event_type": "CANDIDATE_BLOCKED",
+        "object_id": "listing-demo-2",
+        "reason_code": "BUDGET_EXCEEDED"
+      },
+      {
+        "at": "2026-09-29T14:42:08Z",
+        "actor": "server",
+        "event_type": "CANDIDATE_BLOCKED",
+        "object_id": "listing-demo-3",
+        "reason_code": "BUDGET_EXCEEDED"
+      },
+      {
+        "at": "2026-09-29T14:42:08Z",
+        "actor": "server",
+        "event_type": "AGREEMENT_CREATED",
+        "object_id": "agreement-a2b89ccf5226477b",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:42:10Z",
+        "actor": "buyer-demo",
+        "event_type": "AGREEMENT_APPROVED",
+        "object_id": "agreement-a2b89ccf5226477b",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:42:10Z",
+        "actor": "seller-demo-1",
+        "event_type": "AGREEMENT_APPROVED",
+        "object_id": "agreement-a2b89ccf5226477b",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:42:15Z",
+        "actor": "chain",
+        "event_type": "AGREEMENT_RECORDED",
+        "object_id": "agreement-a2b89ccf5226477b",
+        "reason_code": null
+      }
+    ],
+    "skipped_candidates": [
+      {
+        "listing_id": "listing-demo-2",
+        "reason_code": "BUDGET_EXCEEDED"
+      },
+      {
+        "listing_id": "listing-demo-3",
+        "reason_code": "BUDGET_EXCEEDED"
+      }
+    ],
+    "kiln": {
+      "calls": 3,
+      "ok": 3,
+      "input_tokens": 1230,
+      "output_tokens": 343,
+      "cost_usd": 0.00017116
+    }
+  },
+  {
+    "flow_id": "flow-675dd1434e82423f",
+    "label": "C · 기한 단축",
+    "signed_by": "local test wallets via scripts/run_flows.py",
+    "started_at": "2026-09-29T14:42:15Z",
+    "intent": {
+      "gpu_model": "RTX 4090",
+      "max_total_krw": 2400000,
+      "delivery_deadline": "2026-10-02T14:42:15Z",
+      "must_have": [
+        "evidence_present"
+      ]
+    },
+    "negotiation_status": "AWAITING_APPROVALS",
+    "blocked": [
+      "DEADLINE_MISSED",
+      "DEADLINE_MISSED"
+    ],
+    "offers": [
+      {
+        "listing_id": "listing-demo-1",
+        "title": "RTX 4090 Founders Edition",
+        "round": 2,
+        "total_krw": 1940000
+      }
+    ],
+    "agreement": {
+      "id": "agreement-4a2dc6d834244de8",
+      "status": "RECORDED",
+      "listing_id": "listing-demo-1",
+      "total_krw": 1940000,
+      "snapshot_hash": "0x5375c20820d0b1f74b9012d488c2e820479fd9235638955afc2e7d00b9e2d335",
+      "buyer_wallet": "0x94fc747198f989d2852bd35cd9f38dafa927b855",
+      "seller_wallet": "0x0887deebfa7451b41ab911f75f600534095e581e",
+      "tx_hash": "0x92d71f32579b00f205b4aec6c0646060f75d81f3fc4dcc278ae31614e296c269",
+      "block_number": 47462330,
+      "receipt_status": "success",
+      "rpc_check": {
+        "status": 1,
+        "block_number": 47462330,
+        "to": "0x265756b7d5C4CeEd6976F87E54E44ED0921ac013",
+        "logs": 1
+      }
+    },
+    "events": [
+      {
+        "at": "2026-09-29T14:42:15Z",
+        "actor": "buyer-demo",
+        "event_type": "NEGOTIATION_STARTED",
+        "object_id": "neg-261e8aef87b54da5",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:42:22Z",
+        "actor": "server",
+        "event_type": "OFFER_ALLOWED",
+        "object_id": "listing-demo-1",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:42:22Z",
+        "actor": "server",
+        "event_type": "CANDIDATE_BLOCKED",
+        "object_id": "listing-demo-2",
+        "reason_code": "DEADLINE_MISSED"
+      },
+      {
+        "at": "2026-09-29T14:42:22Z",
+        "actor": "server",
+        "event_type": "CANDIDATE_BLOCKED",
+        "object_id": "listing-demo-3",
+        "reason_code": "DEADLINE_MISSED"
+      },
+      {
+        "at": "2026-09-29T14:42:22Z",
+        "actor": "server",
+        "event_type": "AGREEMENT_CREATED",
+        "object_id": "agreement-4a2dc6d834244de8",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:42:23Z",
+        "actor": "buyer-demo",
+        "event_type": "AGREEMENT_APPROVED",
+        "object_id": "agreement-4a2dc6d834244de8",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:42:23Z",
+        "actor": "seller-demo-1",
+        "event_type": "AGREEMENT_APPROVED",
+        "object_id": "agreement-4a2dc6d834244de8",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:42:32Z",
+        "actor": "chain",
+        "event_type": "AGREEMENT_RECORDED",
+        "object_id": "agreement-4a2dc6d834244de8",
+        "reason_code": null
+      }
+    ],
+    "skipped_candidates": [
+      {
+        "listing_id": "listing-demo-2",
+        "reason_code": "DEADLINE_MISSED"
+      },
+      {
+        "listing_id": "listing-demo-3",
+        "reason_code": "DEADLINE_MISSED"
+      }
+    ],
+    "kiln": {
+      "calls": 4,
+      "ok": 4,
+      "input_tokens": 1714,
+      "output_tokens": 385,
+      "cost_usd": 0.00020624
+    }
+  }
+]

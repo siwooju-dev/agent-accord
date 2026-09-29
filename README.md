@@ -133,7 +133,19 @@ cd frontend && npm run dev                 # http://localhost:5173/?mode=live
 - 세 흐름 모두 Kiln `qwen3-32b` 실제 호출이고, 트랜잭션은 AgreementRegistry가 두 서명을 검증한 뒤 남긴 기록이다.
 
 <!-- proof:start -->
-(`scripts/export_proof.py` 실행 후 채워짐)
+
+| Flow | Buyer condition | Kiln calls | Kiln cost | Agreement | Signed by | On-chain tx |
+|---|---|---|---|---|---|---|
+| A · 기본 조건 | RTX 4090 · 예산 2,400,000원 · 기한 2026-10-09 | 10/12 | $0.000636 | RECORDED 2,105,000원 | MetaMask in the web UI | [`0x10afa7be…616ec2`](https://sepolia.basescan.org/tx/0x10afa7beea789bb553967366342599273839c29536e641eacc1b1851fc616ec2) |
+| B · 예산 감소 | RTX 4090 · 예산 2,000,000원 · 기한 2026-10-09 | 3/3 | $0.000171 | RECORDED 1,920,000원 | local test wallets via scripts/run_flows.py | [`0x8dbadc19…804919`](https://sepolia.basescan.org/tx/0x8dbadc1998fb60276992c5a53c23bd746edd4577265d5a84a9e64c830d804919) |
+| C · 기한 단축 | RTX 4090 · 예산 2,400,000원 · 기한 2026-10-02 | 4/4 | $0.000206 | RECORDED 1,940,000원 | local test wallets via scripts/run_flows.py | [`0x92d71f32…96c269`](https://sepolia.basescan.org/tx/0x92d71f32579b00f205b4aec6c0646060f75d81f3fc4dcc278ae31614e296c269) |
+
+- Total Kiln cost for these flows: $0.001013 · 9,842 tokens
+- Model calls avoided: 4 candidate(s) failed the server's budget/deadline pre-check, so no Kiln call was made for them (about 3 calls each: assessment, buyer offer, seller reply).
+- Energy (assumption, not a measurement): at 0.3 Wh per 1,000 tokens, ≈ 2.95 Wh for these flows.
+
+Full per-call log: [docs/PROOF.md](docs/PROOF.md)
+
 <!-- proof:end -->
 
 ## 테스트
