@@ -6,6 +6,8 @@
 @font-face { font-family: "Pretendard"; font-weight: 800; font-display: swap; src: url("./assets/fonts/Pretendard-ExtraBold.subset.woff2") format("woff2"); }
 
 * { box-sizing: border-box; }
+html { scrollbar-gutter: stable; -webkit-tap-highlight-color: transparent; }
+html:has(dialog[open]) { overflow: hidden; }
 html, body { margin: 0; min-width: 320px; }
 body {
   min-height: 100vh;
@@ -21,7 +23,12 @@ body {
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
-h1, h2, h3, p, dl, dd, ul, ol { margin: 0; }
+h1, h2, h3, h4, h5, p, dl, dd, ul, ol, figure { margin: 0; }
+p { text-wrap: pretty; }
+button, a, input, [tabindex] { touch-action: manipulation; }
+:focus-visible { outline: 2px solid var(--accent, #3182f6); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--accent, #3182f6) 22%, transparent); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 ul, ol { padding: 0; list-style: none; }
 a { color: inherit; }
 @media (prefers-reduced-motion: reduce) {

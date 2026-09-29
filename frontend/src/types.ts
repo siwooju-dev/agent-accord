@@ -3,6 +3,7 @@ export type PageKey =
   "overview" | "conditions" | "negotiation" | "agreement" | "audit";
 export type EvidenceStatus =
   "checked" | "seller_claimed" | "conflicted" | "unknown";
+export type EvidenceKind = "video" | "receipt" | "serial" | "warranty";
 
 export interface BuyerIntent {
   id: string;
@@ -14,6 +15,7 @@ export interface BuyerIntent {
 
 export interface Evidence {
   id: string;
+  kind: EvidenceKind;
   label: string;
   source: string;
   status: EvidenceStatus;

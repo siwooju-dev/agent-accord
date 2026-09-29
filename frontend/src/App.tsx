@@ -1,8 +1,8 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import type { GpuHotspot } from "./components/GpuScene";
-import { GpuArt } from "./components/GpuArt";
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { HashDie } from "./components/HashDie";
 import { Icon } from "./components/Icon";
+import { Img } from "./components/Img";
+import { EVIDENCE_ICON, EvidenceChip, EvidenceStatus, ListingSheet, clock, listingItems } from "./components/ListingSheet";
 import { PriceRuler, type RulerRow } from "./components/PriceRuler";
 import {
   DEMO_BUYER_INTENT,
@@ -12,6 +12,7 @@ import {
   DEMO_OFFERS,
   INITIAL_AUDIT_EVENTS,
 } from "./data/demo";
+import { ALL_CREDITS, EVIDENCE_VIEWS, LISTING_PHOTOS, coverOf } from "./data/media";
 import {
   approvalPayloadMatches,
   createAgreementSnapshot,
@@ -23,9 +24,8 @@ import { LOOKS, lookById, readStoredLook, storeLook, type LookId } from "./looks
 import type { AgreementSnapshot, AuditEvent, BuyerIntent, Evidence, Listing, PageKey, UserRole } from "./types";
 import "./App.css";
 
-const GpuScene = lazy(() => import("./components/GpuScene").then((m) => ({ default: m.GpuScene })));
-
 type Evaluation = ReturnType<typeof validateOffers>[number];
+type OpenSheet = (listingId: string, itemId?: string) => void;
 
 const nav: { id: PageKey; label: string }[] = [
   { id: "overview", label: "개요" },
@@ -61,34 +61,37 @@ const pageCopy: Record<Exclude<PageKey, "overview">, { eyebrow: string; title: s
 const money = (n: number) => "₩" + new Intl.NumberFormat("ko-KR").format(n);
 const date = (value: string) =>
   new Date(value + (value.length === 10 ? "T12:00:00" : "")).toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
-const evidenceTone: Record<Evidence["status"], GpuHotspot["tone"]> = {
-  checked: "pass",
-  seller_claimed: "warn",
-  conflicted: "block",
-  unknown: "idle",
-};
-const evidenceLabel: Record<Evidence["status"], string> = {
-  checked: "확인됨",
-  seller_claimed: "판매자 주장",
-  conflicted: "정보가 서로 달라요",
-  unknown: "아직 확인 안 됨",
-};
 const reasonKo: Record<string, string> = {
   BUDGET_EXCEEDED: "예산 초과",
   DELIVERY_DEADLINE: "배송 기한 초과",
   TOTAL_MISMATCH: "총액 불일치",
 };
+const evidenceOf = (ids: string[] | undefined) => DEMO_EVIDENCE.filter((item) => ids?.includes(item.id));
+const flagged = (ids: string[] | undefined) => evidenceOf(ids).filter((item) => item.status === "conflicted").length;
 
-const FINISH_BY_LISTING: Record<string, "silver" | "black" | "white"> = {
-  "listing-01": "silver",
-  "listing-02": "black",
-  "listing-03": "white",
-};
-const variantOf = (item: Listing | undefined) => ({
-  fans: (item?.id === "listing-01" ? 2 : 3) as 2 | 3,
-  label: (item?.model ?? "RTX 4090").toUpperCase(),
-  finish: FINISH_BY_LISTING[item?.id ?? ""] ?? "white",
-});
+function readItemParam() {
+  try {
+    return new URLSearchParams(window.location.search).get("item");
+  } catch {
+    return null;
+  }
+}
+function writeItemParam(item: string | null) {
+  try {
+    const url = new URL(window.location.href);
+    if (item) url.searchParams.set("item", item);
+    else url.searchParams.delete("item");
+    window.history.replaceState(null, "", url);
+  } catch {
+    /* deep links are a convenience */
+  }
+}
+function listingOfItem(item: string | null) {
+  if (!item) return undefined;
+  return DEMO_LISTINGS.find(
+    (listing) => listing.evidenceIds.includes(item) || LISTING_PHOTOS[listing.id]?.some((photo) => photo.id === item),
+  );
+}
 
 function App() {
   const [look, setLook] = useState<LookId>(readStoredLook);
@@ -110,6 +113,17 @@ function App() {
   const [events, setEvents] = useState<AuditEvent[]>(INITIAL_AUDIT_EVENTS);
   const [toast, setToast] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const [sheet, setSheet] = useState<{ listingId: string; itemId: string } | null>(() => {
+    const item = readItemParam();
+    const owner = listingOfItem(item);
+    return owner && item ? { listingId: owner.id, itemId: item } : null;
+  });
+  const openSheet: OpenSheet = useCallback((listingId, itemId) => {
+    const first = itemId ?? listingItems(listingId)[0]?.id;
+    if (first) setSheet({ listingId, itemId: first });
+  }, []);
+  const selectSheetItem = useCallback((itemId: string) => setSheet((value) => (value ? { ...value, itemId } : value)), []);
+  const closeSheet = useCallback(() => setSheet(null), []);
 
   useEffect(() => storeLook(look), [look]);
   useEffect(() => {
@@ -117,7 +131,7 @@ function App() {
       const target = event.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const index = ["1", "2", "3", "4"].indexOf(event.key);
+      const index = ["1", "2"].indexOf(event.key);
       if (index >= 0) setLook(LOOKS[index].id);
     };
     window.addEventListener("keydown", onKey);
@@ -134,7 +148,9 @@ function App() {
   }, [toast]);
   useEffect(() => {
     window.scrollTo({ top: 0 });
+    document.title = page === "overview" ? "Accord · 중고 GPU 협상" : `${nav.find((item) => item.id === page)?.label} · Accord`;
   }, [page]);
+  useEffect(() => writeItemParam(sheet?.itemId ?? null), [sheet]);
 
   const evaluations = useMemo(() => validateOffers(DEMO_OFFERS, intent), [intent]);
   const visibleEvaluations =
@@ -267,44 +283,6 @@ function App() {
     setToast("매물 초안을 이 브라우저에만 임시 저장했어요.");
   }
 
-  const current = lookById(look);
-  const [shots, setShots] = useState<Record<string, string>>({});
-  useEffect(() => {
-    let alive = true;
-    const palette = lookById(look).gpu;
-    import("./three/thumbnails")
-      .then((module) =>
-        module.renderGpuShots(
-          look,
-          palette,
-          DEMO_LISTINGS.map((item) => ({ key: item.id, variant: variantOf(item) })),
-        ),
-      )
-      .then((result) => {
-        if (alive) setShots(result);
-      })
-      .catch(() => {
-        /* no WebGL: the SVG illustration stays */
-      });
-    return () => {
-      alive = false;
-    };
-  }, [look]);
-  const hotspots: GpuHotspot[] = listing
-    ? [
-        ...DEMO_EVIDENCE.filter((item) => listing.evidenceIds.includes(item.id)).map(
-          (item, index): GpuHotspot => ({
-            id: item.id,
-            anchor: index === 0 ? "fan" : "back",
-            title: item.label,
-            detail: evidenceLabel[item.status],
-            tone: evidenceTone[item.status],
-          }),
-        ),
-        { id: "warranty", anchor: "bracket", title: "제조사 보증", detail: `${date(listing.warrantyEnd)}까지 · 판매자 주장`, tone: "warn" },
-      ]
-    : [];
-
   return (
     <div className="app">
       <LookBar look={look} setLook={setLook} />
@@ -329,6 +307,7 @@ function App() {
         </nav>
         <div className="nav-tools">
           <span className="mock-badge">Demo · mock</span>
+          <BackendChip />
           <a className="live-link" href="?mode=live">
             실제 API
           </a>
@@ -356,12 +335,7 @@ function App() {
             buyerSigned={buyerSigned}
             sellerSigned={sellerSigned}
             setPage={setPage}
-            gpu={
-              <Suspense fallback={<div className="scene-loading">3D 모델 불러오는 중…</div>}>
-                <GpuScene palette={current.gpu} variant={variantOf(listing)} hotspots={hotspots} />
-              </Suspense>
-            }
-            shots={shots}
+            openSheet={openSheet}
           />
         )}
         {page === "conditions" && (
@@ -383,7 +357,7 @@ function App() {
             setSellerPrice={setSellerPrice}
             saveSeller={saveSeller}
             evaluations={evaluations}
-            shots={shots}
+            openSheet={openSheet}
           />
         )}
         {page === "negotiation" && (
@@ -395,6 +369,7 @@ function App() {
             setSelectedId={chooseOffer}
             setPage={setPage}
             scenario={scenario}
+            openSheet={openSheet}
           />
         )}
         {page === "agreement" && (
@@ -421,7 +396,7 @@ function App() {
             sign={sign}
             reject={reject}
             setPage={setPage}
-            shot={listing ? shots[listing.id] : undefined}
+            openSheet={openSheet}
           />
         )}
         {page === "audit" && <Audit events={events} />}
@@ -432,7 +407,33 @@ function App() {
           <Icon name="alert" size={13} /> {DEMO_NOTICE}
         </span>
         <span>Kiln · 테스트넷 · 실제 지갑 미연결 · UI 시안</span>
+        <details className="credits">
+          <summary>사진 · 영상 출처 {ALL_CREDITS.length}건</summary>
+          <p>매물 사진과 영상은 Wikimedia Commons의 자유 라이선스 자료예요. 매물·판매자·영수증은 가상이에요.</p>
+          <ul>
+            {ALL_CREDITS.map((credit) => (
+              <li key={credit.url}>
+                <a href={credit.url} target="_blank" rel="noreferrer">
+                  {credit.title}
+                </a>{" "}
+                · {credit.author} · {credit.license}
+                {credit.edited ? ` · ${credit.edited}` : ""}
+              </li>
+            ))}
+          </ul>
+        </details>
       </footer>
+
+      {sheet && (
+        <ListingSheet
+          listingId={sheet.listingId}
+          itemId={sheet.itemId}
+          onSelect={selectSheetItem}
+          onClose={closeSheet}
+          priceKrw={evaluations.find((item) => item.offer.listingId === sheet.listingId)?.offer.totalKrw}
+          now={now}
+        />
+      )}
 
       {toast && (
         <div className="toast" role="status" aria-live="polite">
@@ -477,9 +478,31 @@ function LookBar({ look, setLook }: { look: LookId; setLook: (id: LookId) => voi
         ))}
       </div>
       <span className="lookbar-note">
-        {current.tagline} <kbd>1</kbd>–<kbd>4</kbd>
+        {current.tagline} <kbd>1</kbd> <kbd>2</kbd>
       </span>
     </div>
+  );
+}
+
+/** Shows the backend behind the dev/preview proxy when one answers; stays hidden on static hosting. */
+function BackendChip() {
+  const [info, setInfo] = useState<{ mode?: string; contract?: string } | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/__backend/health", { signal: controller.signal, headers: { Accept: "application/json" } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { status?: string; mode?: string; contract_version?: string } | null) => {
+        if (data?.status === "ok") setInfo({ mode: data.mode, contract: data.contract_version });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+  if (!info) return null;
+  return (
+    <span className="backend-chip" title={`백엔드 연결됨 · mode ${info.mode ?? "?"} · contract v${info.contract ?? "?"}`}>
+      <i /> 백엔드 {info.mode ?? "on"}
+      {info.contract ? ` · v${info.contract}` : ""}
+    </span>
   );
 }
 
@@ -550,15 +573,6 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-function EvidenceTag({ state }: { state: Evidence["status"] }) {
-  return (
-    <span className={"pill small tone-" + (state === "checked" ? "pass" : state === "seller_claimed" ? "warn" : state === "conflicted" ? "block" : "idle")}>
-      <i />
-      {evidenceLabel[state]}
-    </span>
-  );
-}
-
 function Verdict({ status, sellerMode = false, reason }: { status: Evaluation["status"]; sellerMode?: boolean; reason?: string }) {
   return status === "valid" ? (
     <span className="pill tone-pass">
@@ -583,8 +597,7 @@ function Overview({
   buyerSigned,
   sellerSigned,
   setPage,
-  gpu,
-  shots,
+  openSheet,
 }: {
   role: UserRole;
   intent: BuyerIntent;
@@ -595,10 +608,10 @@ function Overview({
   buyerSigned: boolean;
   sellerSigned: boolean;
   setPage: (page: PageKey) => void;
-  gpu: ReactNode;
-  shots: Record<string, string>;
+  openSheet: OpenSheet;
 }) {
   const valid = evaluations.filter((item) => item.status === "valid").length;
+  const conflicts = evaluations.reduce((sum, item) => sum + flagged(item.offer.evidenceIds), 0);
   return (
     <div className="overview">
       <section className="hero">
@@ -621,9 +634,7 @@ function Overview({
             </button>
           </div>
         </div>
-        <div className="hero-visual">
-          <div className="hero-stage">{gpu}</div>
-        </div>
+        <HeroBento openSheet={openSheet} />
       </section>
 
       <section className="section">
@@ -632,7 +643,14 @@ function Overview({
             받은 제안 <span className="count">{evaluations.length}</span>
           </h2>
           <span className="section-meta">
-            <span className="c-pass">{valid}개 조건 통과</span>
+            <span className="c-pass">
+              <Icon name="pass" size={14} /> 조건 통과 {valid}
+            </span>
+            {conflicts > 0 && role === "buyer" && (
+              <span className="c-block">
+                <Icon name="block" size={14} /> 증빙 충돌 {conflicts}
+              </span>
+            )}
             <button className="link-btn" onClick={() => setPage("negotiation")}>
               협상 자세히 <Icon name="arrow" size={14} />
             </button>
@@ -644,8 +662,8 @@ function Overview({
               key={item.offer.id}
               evaluation={item}
               active={item.offer.id === selectedId}
-              shot={shots[item.offer.listingId]}
               onSelect={() => chooseOffer(item.offer.id)}
+              openSheet={openSheet}
               sellerMode={role === "seller"}
             />
           ))}
@@ -692,29 +710,107 @@ function Overview({
   );
 }
 
+const prefersReducedMotion = () => {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+};
+
+function HeroBento({ openSheet }: { openSheet: OpenSheet }) {
+  const main = LISTING_PHOTOS["listing-01"][0];
+  const clip = EVIDENCE_VIEWS["evidence-03"].media;
+  const serial = EVIDENCE_VIEWS["evidence-04"].media;
+  const [time, setTime] = useState(0);
+  const [motion] = useState(() => !prefersReducedMotion());
+  const readout = clip.type === "video" ? clip.readout?.find((entry) => time >= entry.from) : undefined;
+  return (
+    <div className="hero-visual">
+      <div className="bento">
+        <button type="button" className="tile tile-main" onClick={() => openSheet("listing-01", main.id)} aria-label="셀러 01 RTX 4090 Founders Edition 사진 보기">
+          <Img src={main.src} alt={main.alt} width={main.w} height={main.h} focus={main.focus} eager />
+          <span className="tile-cap">
+            <small>셀러 01 · 사진 {LISTING_PHOTOS["listing-01"].length}</small>
+            <b>RTX 4090 Founders Edition</b>
+          </span>
+          <span className="tile-badge tone-warn">
+            <Icon name="receipt" size={13} /> 영수증 · 판매자 주장
+          </span>
+        </button>
+        {clip.type === "video" && (
+          <button type="button" className="tile tile-video" onClick={() => openSheet("listing-02", "evidence-03")} aria-label="셀러 02 작동 영상 보기">
+            <video
+              poster={clip.poster}
+              muted
+              loop
+              playsInline
+              autoPlay={motion}
+              preload="metadata"
+              onTimeUpdate={(event) => setTime(event.currentTarget.currentTime)}
+              aria-hidden="true"
+            >
+              <source src={clip.src} type="video/mp4" />
+              <source src={clip.webm} type="video/webm" />
+            </video>
+            <span className="tile-badge on-dark">
+              <i className="rec" /> 작동 영상 · {clock(clip.duration)}
+            </span>
+            <span className={"tile-read" + (readout ? " is-on" : "")} aria-hidden="true">
+              <small>GPU</small>
+              <b>{readout ? readout.value : "--°C"}</b>
+            </span>
+          </button>
+        )}
+        {serial.type === "serial" && (
+          <button type="button" className="tile tile-serial" onClick={() => openSheet("listing-02", "evidence-05")} aria-label="셀러 02 보증 조회 결과 보기">
+            <span className="tile-serial-img">
+              <Img src={serial.photo.src} alt="" width={serial.photo.w} height={serial.photo.h} focus="0% 42%" />
+            </span>
+            <span className="tile-badge tone-block">
+              <Icon name="block" size={13} /> 보증 조회 · 모델 불일치
+            </span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OfferCard({
   evaluation,
   active,
-  shot,
   onSelect,
+  openSheet,
   sellerMode,
 }: {
   evaluation: Evaluation;
   active: boolean;
-  shot?: string;
   onSelect: () => void;
+  openSheet: OpenSheet;
   sellerMode: boolean;
 }) {
   const owner = DEMO_LISTINGS.find((entry) => entry.id === evaluation.offer.listingId);
+  const cover = coverOf(owner?.id);
+  const photos = owner ? LISTING_PHOTOS[owner.id]?.length ?? 0 : 0;
+  const evidence = evidenceOf(evaluation.offer.evidenceIds);
   return (
-    <button className={"offer-card" + (active ? " is-active" : "")} onClick={onSelect} aria-pressed={active}>
+    <article className={"offer-card" + (active ? " is-active" : "")}>
+      <button
+        type="button"
+        className="offer-select"
+        onClick={onSelect}
+        aria-pressed={active}
+        aria-label={`${owner?.sellerName} ${owner?.model} ${money(evaluation.offer.totalKrw)} 제안 선택`}
+      />
       <span className="offer-shot">
-        {shot ? (
-          <img src={shot} alt="" />
-        ) : (
-          <GpuArt id={evaluation.offer.id} label={owner?.model ?? ""} fans={owner?.id === "listing-01" ? 2 : 3} />
-        )}
+        {cover && <Img src={cover.src} alt={cover.alt} width={cover.w} height={cover.h} focus={cover.focus} />}
         <span className={"offer-radio" + (active ? " on" : "")} aria-hidden="true" />
+        {owner && cover && (
+          <button type="button" className="offer-photos" onClick={() => openSheet(owner.id, cover.id)} aria-label={`사진 ${photos}장 보기`}>
+            <Icon name="camera" size={13} /> {photos}
+          </button>
+        )}
       </span>
       <span className="offer-body">
         <span className="offer-seller">
@@ -725,11 +821,16 @@ function OfferCard({
           <strong>{money(evaluation.offer.totalKrw)}</strong>
           <Verdict status={evaluation.status} sellerMode={sellerMode} reason={evaluation.reasonCode} />
         </span>
+        <span className="ev-chips">
+          {evidence.map((item) => (
+            <EvidenceChip key={item.id} evidence={item} onOpen={() => owner && openSheet(owner.id, item.id)} />
+          ))}
+        </span>
         <span className="offer-meta">
           <Icon name="truck" size={14} /> {date(evaluation.offer.deliveryBy)} 도착 · 배송비 {money(evaluation.offer.shippingFeeKrw)}
         </span>
       </span>
-    </button>
+    </article>
   );
 }
 
@@ -753,7 +854,7 @@ function Conditions({
   setSellerPrice,
   saveSeller,
   evaluations,
-  shots,
+  openSheet,
 }: {
   role: UserRole;
   intent: BuyerIntent;
@@ -772,7 +873,7 @@ function Conditions({
   setSellerPrice: (value: string) => void;
   saveSeller: (event: FormEvent<HTMLFormElement>) => void;
   evaluations: Evaluation[];
-  shots: Record<string, string>;
+  openSheet: OpenSheet;
 }) {
   const dirty =
     model.trim() !== intent.gpuModel ||
@@ -901,17 +1002,7 @@ function Conditions({
             </Card>
           ) : (
             <Card title="첨부한 증빙" sub="구매자 에이전트가 확인하는 자료예요">
-              <ul className="ev-list">
-                {DEMO_EVIDENCE.filter((item) => DEMO_LISTINGS[1].evidenceIds.includes(item.id)).map((item) => (
-                  <li key={item.id}>
-                    <span>
-                      <b>{item.label}</b>
-                      <small>{item.source}</small>
-                    </span>
-                    <EvidenceTag state={item.status} />
-                  </li>
-                ))}
-              </ul>
+              <EvidenceList items={evidenceOf(DEMO_LISTINGS[1].evidenceIds)} onOpen={(id) => openSheet("listing-02", id)} />
             </Card>
           )}
           <div className="callout">
@@ -932,10 +1023,22 @@ function Conditions({
         {DEMO_LISTINGS.map((item) => {
           const evaluation = evaluations.find((entry) => entry.offer.listingId === item.id);
           const hidden = role === "seller" && item.id !== "listing-02";
+          const photos = LISTING_PHOTOS[item.id] ?? [];
+          const cover = photos[0];
           return (
             <article className="listing" key={item.id}>
               <div className="listing-art">
-                {shots[item.id] ? <img className="listing-shot" src={shots[item.id]} alt={`${item.model} 3D 렌더`} /> : <GpuArt id={item.id} label={item.model} fans={item.id === "listing-01" ? 2 : 3} />}
+                {cover && (
+                  <button type="button" className="listing-cover" onClick={() => openSheet(item.id, cover.id)} aria-label={`${item.model} 사진 ${photos.length}장 보기`}>
+                    <Img src={cover.src} alt={cover.alt} width={cover.w} height={cover.h} focus={cover.focus} />
+                  </button>
+                )}
+                <span className="listing-strip" aria-hidden="true">
+                  {photos.slice(1, 4).map((photo) => (
+                    <img key={photo.id} src={photo.src} alt="" loading="lazy" decoding="async" />
+                  ))}
+                  {photos.length > 4 && <em>+{photos.length - 4}</em>}
+                </span>
                 {!hidden && evaluation && (
                   <span className="listing-verdict">
                     <Verdict status={evaluation.status} reason={evaluation.reasonCode} />
@@ -958,24 +1061,45 @@ function Conditions({
                     <dd>{date(item.deliveryBy)}</dd>
                   </div>
                   <div>
-                    <dt>보증</dt>
+                    <dt>보증 (판매자 입력)</dt>
                     <dd>{date(item.warrantyEnd)}</dd>
                   </div>
                 </dl>
-                <ul className="listing-ev">
-                  {DEMO_EVIDENCE.filter((e) => item.evidenceIds.includes(e.id)).map((e) => (
-                    <li key={e.id}>
-                      <span>{e.label}</span>
-                      <EvidenceTag state={e.status} />
-                    </li>
-                  ))}
-                </ul>
+                <EvidenceList items={evidenceOf(item.evidenceIds)} onOpen={(id) => openSheet(item.id, id)} dense />
               </div>
             </article>
           );
         })}
       </div>
     </div>
+  );
+}
+
+function EvidenceList({ items, onOpen, dense = false }: { items: Evidence[]; onOpen: (id: string) => void; dense?: boolean }) {
+  return (
+    <ul className={"ev-rows" + (dense ? " dense" : "")}>
+      {items.map((item) => {
+        const view = EVIDENCE_VIEWS[item.id];
+        return (
+          <li key={item.id}>
+            <button type="button" className="ev-row" onClick={() => onOpen(item.id)}>
+              <span className="ev-row-icon">
+                <Icon name={EVIDENCE_ICON[item.kind]} size={16} />
+              </span>
+              <span className="ev-row-text">
+                <b>
+                  {item.label}
+                  {view?.media.type === "video" && <em>{clock(view.media.duration)}</em>}
+                </b>
+                {!dense && <small>{item.source}</small>}
+              </span>
+              <EvidenceStatus status={item.status} />
+              <Icon name="next" size={15} className="ev-row-go" />
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -989,6 +1113,7 @@ function Negotiation({
   setSelectedId,
   setPage,
   scenario,
+  openSheet,
 }: {
   role: UserRole;
   intent: BuyerIntent;
@@ -997,10 +1122,12 @@ function Negotiation({
   setSelectedId: (id: string) => void;
   setPage: (page: PageKey) => void;
   scenario: (kind: "A" | "B" | "C") => void;
+  openSheet: OpenSheet;
 }) {
   const selected = evaluations.find((item) => item.offer.id === selectedId) ?? evaluations[0];
   const listing = DEMO_LISTINGS.find((item) => item.id === selected?.offer.listingId);
-  const evidence = DEMO_EVIDENCE.filter((item) => selected?.offer.evidenceIds.includes(item.id));
+  const evidence = evidenceOf(selected?.offer.evidenceIds);
+  const conflicts = flagged(selected?.offer.evidenceIds);
   const sellerMode = role === "seller";
   const checks = selected ? inspectOffer(selected.offer, intent) : [];
   const reasonText =
@@ -1114,18 +1241,17 @@ function Negotiation({
               </div>
             )}
           </Card>
-          <Card title="증빙 상태" sub="판매자가 올린 자료와 확인 여부">
-            <ul className="ev-list">
-              {evidence.map((item) => (
-                <li key={item.id}>
-                  <span>
-                    <b>{item.label}</b>
-                    <small>{item.source}</small>
-                  </span>
-                  <EvidenceTag state={item.status} />
-                </li>
-              ))}
-            </ul>
+          <Card title="증빙 상태" sub="눌러서 영상 · 사진 · 조회 결과를 직접 확인하세요">
+            <EvidenceList items={evidence} onOpen={(id) => listing && openSheet(listing.id, id)} />
+            {conflicts > 0 && !sellerMode && (
+              <div className="callout danger">
+                <Icon name="block" size={18} />
+                <p>
+                  <b>서버 규칙은 통과했지만 증빙이 서로 달라요</b>
+                  규칙 통과는 금액·기한 검사예요. 진품이나 시리얼 일치를 보장하지 않으니, 서명 전에 판매자에게 다시 확인하세요.
+                </p>
+              </div>
+            )}
             <div className="card-foot">
               <span>
                 <Icon name="clock" size={13} /> {date(selected.offer.expiresAt.slice(0, 10))}에 만료
@@ -1166,7 +1292,7 @@ function Agreement({
   sign,
   reject,
   setPage,
-  shot,
+  openSheet,
 }: {
   role: UserRole;
   listing: Listing | undefined;
@@ -1190,9 +1316,11 @@ function Agreement({
   sign: () => void;
   reject: () => void;
   setPage: (page: PageKey) => void;
-  shot?: string;
+  openSheet: OpenSheet;
 }) {
   const valid = evaluation?.status === "valid";
+  const cover = coverOf(listing?.id);
+  const attached = evidenceOf(evaluation?.offer.evidenceIds);
   const detail =
     status === "RECORDING"
       ? "양쪽 데모 서명을 받았어요. 실제 체인 영수증이 없어서 '기록 완료'로 표시하지 않아요."
@@ -1251,10 +1379,13 @@ function Agreement({
       ) : (
         <div className="split">
           <section className="card doc">
-            {shot && (
-              <div className="doc-shot">
-                <img src={shot} alt={`${snapshot.model} 3D 렌더`} />
-              </div>
+            {cover && listing && (
+              <button type="button" className="doc-shot" onClick={() => openSheet(listing.id, cover.id)} aria-label="매물 사진 크게 보기">
+                <Img src={cover.src} alt={cover.alt} width={cover.w} height={cover.h} focus={cover.focus} />
+                <span className="doc-shot-tag">
+                  <Icon name="camera" size={13} /> 사진 {LISTING_PHOTOS[listing.id]?.length ?? 0} · 증빙 {attached.length}
+                </span>
+              </button>
             )}
             <header className="doc-head">
               <div>
@@ -1289,6 +1420,18 @@ function Agreement({
               <div>
                 <dt>제안 만료</dt>
                 <dd>{date(snapshot.expiresAt.slice(0, 10))}</dd>
+              </div>
+              <div>
+                <dt>첨부 증빙</dt>
+                <dd className="doc-ev">
+                  {attached.map((item, index) => (
+                    <button type="button" key={item.id} className={"doc-ev-row tone-" + (item.status === "checked" ? "pass" : item.status === "conflicted" ? "block" : item.status === "seller_claimed" ? "warn" : "idle")} onClick={() => listing && openSheet(listing.id, item.id)}>
+                      <Icon name={EVIDENCE_ICON[item.kind]} size={14} />
+                      <span>{item.label}</span>
+                      <code>{snapshot.evidenceHashes[index]}</code>
+                    </button>
+                  ))}
+                </dd>
               </div>
               <div>
                 <dt>구매자 지갑</dt>

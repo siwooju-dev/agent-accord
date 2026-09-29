@@ -29,6 +29,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Empty by default: calls go to same-origin `/api`, which Vite proxies to ACCORD_API_TARGET.
+ * Set VITE_API_BASE_URL only when the backend allows this page's origin via CORS.
+ */
+const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
+/** Path prefix of the backend routes, e.g. `/api/v1`. */
+const API_PREFIX = "/" + String(import.meta.env.VITE_API_PREFIX || "/api").replace(/^\/+|\/+$/g, "");
+
 async function request<T>(
   path: string,
   options: {
@@ -46,7 +54,7 @@ async function request<T>(
 
   let response: Response;
   try {
-    response = await fetch(`/api${path}`, {
+    response = await fetch(`${API_BASE}${API_PREFIX}${path}`, {
       method: options.method ?? "GET",
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
