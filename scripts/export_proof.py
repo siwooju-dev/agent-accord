@@ -166,7 +166,7 @@ def main() -> int:
         out += [f"## {flow['label']}", "",
                 f"- Flow ID: `{flow['flow_id']}` · started {flow['started_at']}",
                 f"- Buyer intent: `{json.dumps(flow['intent'], ensure_ascii=False)}`",
-                f"- Negotiation: {flow['negotiation_status']}"
+                f"- Negotiation result: {flow['negotiation_status']}"
                 + (f" · blocked: {', '.join(code for code in flow['blocked'] if code)}" if flow["blocked"] else ""),
                 "- Skipped before any model call: " + (", ".join(
                     f"{item['listing_id']} ({item['reason_code']})" for item in flow["skipped_candidates"]) or "none"),
@@ -184,7 +184,7 @@ def main() -> int:
             out.append(
                 f"| {index} | {call.get('at', '')[11:19]} | {call.get('actor')} | {STEP_LABEL.get(call.get('step'), call.get('step'))} "
                 f"| `{call.get('generation_id') or '-'}` | {call.get('input_tokens') or '-'}/{call.get('output_tokens') or '-'} "
-                f"| {call.get('cost_usd') if call.get('cost_usd') is not None else '-'} | {call.get('latency_ms')}ms | {call.get('outcome')} |")
+                f"| {f"{call['cost_usd']:.8f}" if call.get('cost_usd') is not None else '-'} | {call.get('latency_ms')}ms | {call.get('outcome')} |")
         out.append("")
     (DOCS / "PROOF.md").write_text("\n".join(out), encoding="utf-8")
     # Keep the README summary in sync: replace the block between the proof markers.
