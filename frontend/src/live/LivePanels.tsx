@@ -37,9 +37,9 @@ export function BuyerForm({ busy, intent, onCreate, onStart }: {
   return <section className="live-card">
     <div className="live-card-head"><h2>구매 조건</h2><span>구매자 본인에게만 예산 표시</span></div>
     <div className="live-scenarios" aria-label="데모 조건">
-      <button type="button" onClick={() => { setBudget("500000"); setDeadline(localDate(5)); }}>A 기본</button>
-      <button type="button" onClick={() => { setBudget("400000"); setDeadline(localDate(5)); }}>B 예산 감소</button>
-      <button type="button" onClick={() => { setBudget("500000"); setDeadline(localDate(2)); }}>C 기한 단축</button>
+      <button type="button" onClick={() => { setBudget("2400000"); setDeadline(localDate(10)); }}>A 기본 · 240만원 · 10일</button>
+      <button type="button" onClick={() => { setBudget("2000000"); setDeadline(localDate(10)); }}>B 예산 감소 · 200만원</button>
+      <button type="button" onClick={() => { setBudget("2400000"); setDeadline(localDate(3)); }}>C 기한 단축 · 3일</button>
     </div>
     <form onSubmit={submit} className="live-form">
       <label>GPU 모델<input required value={model} onChange={(event) => setModel(event.target.value)} /></label>
