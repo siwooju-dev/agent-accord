@@ -107,11 +107,19 @@ cd frontend && npm run dev                 # http://localhost:5173/?mode=live
 3. `seller-demo-N`(합의안의 판매자)으로 세션 → MetaMask 계정 2로 바꾸고 → 같은 합의안에 서명.
 4. 두 서명이 모이면 relayer가 기록하고, `RECORDED`와 BaseScan 링크가 뜬다. **흐름 감사**에서 Kiln 호출(generation id·토큰·비용)과 이벤트를 볼 수 있다.
 
-### 5. 증빙 내보내기
+### 5. 스크립트로 흐름 실행 (선택)
 
 ```sh
-.venv/bin/python scripts/export_proof.py --db data/live.sqlite3 --verify \
-  --label <flow_id>="기본" --label <flow_id>="예산 변경" --label <flow_id>="기한 변경"
+.venv/bin/python scripts/run_flows.py A B C
+```
+
+두 번째 live 백엔드(포트 8011, `data/live-script.sqlite3`)를 띄우고, 웹 화면과 같은 HTTP API로 조건 입력 → Kiln 협상 → 양측 EIP-712 서명 → Base Sepolia 기록까지 진행한다. 서명은 `.local/test_wallets.json`(git 제외, 테스트넷 전용, 잔액 없음)의 로컬 테스트 지갑이 한다. MetaMask 서명은 브라우저 흐름에서만 쓴다.
+
+### 6. 증빙 내보내기
+
+```sh
+.venv/bin/python scripts/export_proof.py --db data/live.sqlite3 --db data/live-script.sqlite3 --verify \
+  --label <flow_id>="A · 기본 조건" --label <flow_id>="B · 예산 감소" --label <flow_id>="C · 기한 단축"
 ```
 
 `docs/PROOF.md`, `docs/proof/flows.json`, `docs/proof/kiln_calls.jsonl`을 만들고 아래 표를 갱신한다. `--verify`는 tx receipt를 RPC에서 다시 확인한다. 같은 컨트랙트에 기록한 뒤에는 `data/live.sqlite3`를 지우지 않는다(구매자 nonce가 다시 1부터 시작해 거절된다).
@@ -119,6 +127,10 @@ cd frontend && npm run dev                 # http://localhost:5173/?mode=live
 ## API 사용 증빙 (Proof of API usage)
 
 흐름 3개: 기본 조건 → 예산을 낮춘 조건 → 배송 기한을 당긴 조건. 흐름마다 Kiln 호출 기록과 합의 기록 트랜잭션이 있다.
+
+- **A**는 웹 화면(`/?mode=live`)에서 MetaMask 계정 2개로 구매자·판매자가 직접 서명했다.
+- **B, C**는 `scripts/run_flows.py`가 같은 API와 같은 컨트랙트로 실행하고, 로컬 테스트 지갑으로 서명했다.
+- 세 흐름 모두 Kiln `qwen3-32b` 실제 호출이고, 트랜잭션은 AgreementRegistry가 두 서명을 검증한 뒤 남긴 기록이다.
 
 <!-- proof:start -->
 (`scripts/export_proof.py` 실행 후 채워짐)
