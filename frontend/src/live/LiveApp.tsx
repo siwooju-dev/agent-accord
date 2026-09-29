@@ -275,7 +275,7 @@ export default function LiveApp() {
   const blockReason = approvalBlockReason(agreement, payload, session, wallet, now);
 
   return <div className="live-shell">
-    <header className="live-header"><div><a className="live-brand" href="?mode=mock">accord</a><span>실제 API 연결 모드</span></div><a href="?mode=mock">mock 화면으로 돌아가기</a></header>
+    <header className="live-header"><div><a className="live-brand" href="?mode=mock"><span className="live-brand-mark" aria-hidden="true" />ACCORD</a><span>LIVE API</span></div><a href="?mode=mock">mock 시안으로 돌아가기</a></header>
     <main className="live-main">
       <div className="live-intro"><span className="live-eyebrow">AGENT ACCORD / BASE SEPOLIA</span><h1>조건부터 온체인 기록까지</h1><p>이 화면은 `/api` 백엔드 응답을 사용합니다. 백엔드가 실행 중이지 않으면 연결 오류를 표시합니다. 지갑 서명과 체인 기록은 서버 상태로 확인합니다.</p></div>
       <section className="live-card live-session"><div className="live-card-head"><h2>데모 세션</h2><span>토큰은 화면·로그·저장소에 남기지 않습니다</span></div>

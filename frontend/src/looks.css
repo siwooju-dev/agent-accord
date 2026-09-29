@@ -1,0 +1,490 @@
+/* ════════════ 시안 A · Clear — 밝고 친절한 핀테크 톤 ════════════ */
+:root {
+  --btn-primary-fg: var(--on-accent);
+  --btn-primary-shadow: none;
+  --btn-secondary-fg: var(--fg);
+  --btn-secondary-shadow: none;
+  --em-font: inherit;
+  --em-style: normal;
+  --em-weight: inherit;
+  --em-bg: none;
+  --em-clip: border-box;
+  --em2-color: var(--fg);
+  --em2-bg: none;
+  --em2-clip: border-box;
+  --how-border: 0;
+  --how-n-radius: 50%;
+  --float-bg: var(--surface);
+  --tab-active-bg: var(--surface-2);
+  --tab-active-fg: var(--fg);
+  --tab-hover: var(--surface-2);
+  --offer-active-bg: var(--surface);
+  --avatar-radius: 12px;
+  --stage-border: 0;
+  --stage-shadow: none;
+  --shadow-seg: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --seg-border: 0;
+  --card-bg: var(--surface);
+  --doc-total-bg: var(--surface-2);
+  --toast-bg: #191f28;
+  --toast-fg: #ffffff;
+  --pass-ink: var(--pass);
+  --warn-ink: var(--warn);
+  --block-ink: var(--block);
+  --seller-ink: var(--seller);
+  --font-eyebrow: var(--font);
+  --eyebrow-case: none;
+  --eyebrow-tracking: 0;
+  --card-title-weight: 700;
+  --brand-weight: 700;
+  --display-leading: 1.12;
+  --kicker-bg: var(--accent-soft);
+  --how-bg: var(--surface-2);
+  --art-bg: var(--surface-2);
+}
+
+:root:not([data-look]),
+[data-look="clear"] {
+  color-scheme: light;
+  --bg: #f2f4f6;
+  --bg-image: none;
+  --surface: #ffffff;
+  --surface-2: #f2f4f6;
+  --line: #e5e8eb;
+  --line-2: #d1d6db;
+  --fg: #191f28;
+  --fg-2: #4e5968;
+  --fg-3: #8b95a1;
+  --accent: #3182f6;
+  --accent-ink: #1b64da;
+  --accent-soft: #e8f3ff;
+  --on-accent: #ffffff;
+  --buyer: #3182f6;
+  --buyer-soft: #e8f3ff;
+  --seller: #ff8a3d;
+  --seller-ink: #e0681e;
+  --seller-soft: #fff1e6;
+  --pass: #03b26c;
+  --pass-ink: #02925a;
+  --pass-soft: #e5f8ef;
+  --warn: #ffb331;
+  --warn-ink: #c98800;
+  --warn-soft: #fff6e0;
+  --block: #f04452;
+  --block-ink: #d22030;
+  --block-soft: #ffeeee;
+  --font: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-display: var(--font);
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --display-weight: 800;
+  --display-tracking: -0.035em;
+  --num-weight: 800;
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --radius-pill: 999px;
+  --btn-radius: 16px;
+  --card-border: 0;
+  --shadow-card: 0 1px 2px rgba(0, 27, 55, 0.04);
+  --shadow-pop: 0 14px 36px -14px rgba(0, 27, 55, 0.22);
+  --nav-bg: rgba(255, 255, 255, 0.88);
+  --nav-line: transparent;
+  --btn-primary-bg: #3182f6;
+  --btn-primary-shadow: 0 8px 20px -10px rgba(49, 130, 246, 0.8);
+  --btn-secondary-bg: #e8f3ff;
+  --btn-secondary-fg: #1b64da;
+  --input-bg: #f2f4f6;
+  --input-border: 1.5px solid transparent;
+  --stage-bg: radial-gradient(circle at 70% 20%, #ffffff 0%, rgba(255, 255, 255, 0) 55%), linear-gradient(160deg, #dcebff 0%, #eef5ff 50%, #f7f9fc 100%);
+  --stage-radius: 32px;
+  --em-color: #3182f6;
+  --kicker-bg: #ffffff;
+  --how-bg: #ffffff;
+  --art-bg: linear-gradient(160deg, #eef5ff, #f7f9fc);
+  --art-shadow: rgba(27, 100, 218, 0.18);
+  --ga-top: #ffffff;
+  --ga-bottom: #e4ebf4;
+  --ga-stroke: #d3dce8;
+  --ga-bracket: #b9c3d0;
+  --ga-ring: #d3dce8;
+  --ga-fan-in: #f2f6fb;
+  --ga-fan-out: #cfd9e6;
+  --ga-blade: #ffffff;
+  --ga-hub: #ffffff;
+  --brand-bg: #3182f6;
+  --brand-a: #ffffff;
+  --brand-b: #bcd8ff;
+  --brand-core: #ffffff;
+  --toast-bg: #191f28;
+}
+
+/* ════════════ 시안 B · Aurora — 그라데이션 · 유리 · 세리프 포인트 ════════════ */
+[data-look="aurora"] {
+  color-scheme: light;
+  --bg: #fbfaff;
+  --bg-image:
+    radial-gradient(1100px 620px at 88% -8%, rgba(255, 111, 145, 0.16), transparent 60%),
+    radial-gradient(1000px 640px at -12% 4%, rgba(109, 74, 255, 0.16), transparent 60%),
+    radial-gradient(900px 520px at 55% 38%, rgba(69, 196, 255, 0.1), transparent 62%);
+  --surface: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.72);
+  --surface-2: #f3f0ff;
+  --line: rgba(40, 20, 120, 0.08);
+  --line-2: rgba(40, 20, 120, 0.18);
+  --fg: #120f2a;
+  --fg-2: #4d4a68;
+  --fg-3: #8a87a3;
+  --accent: #6d4aff;
+  --accent-ink: #5b35f5;
+  --accent-soft: #efeaff;
+  --on-accent: #ffffff;
+  --buyer: #6d4aff;
+  --buyer-soft: #efeaff;
+  --seller: #ff6f91;
+  --seller-ink: #e0406a;
+  --seller-soft: #ffeaf0;
+  --pass: #12a150;
+  --pass-soft: #e3f6ea;
+  --warn: #e89a1b;
+  --warn-ink: #b8740a;
+  --warn-soft: #fff2d9;
+  --block: #e5484d;
+  --block-soft: #ffeceb;
+  --font: "Pretendard", -apple-system, system-ui, sans-serif;
+  --font-display: var(--font);
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  --display-weight: 700;
+  --display-tracking: -0.045em;
+  --num-weight: 700;
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-pill: 999px;
+  --btn-radius: 999px;
+  --card-border: 1px solid rgba(40, 20, 120, 0.07);
+  --shadow-card: 0 1px 2px rgba(30, 20, 80, 0.04), 0 18px 44px -24px rgba(60, 40, 160, 0.28);
+  --shadow-pop: 0 24px 60px -24px rgba(60, 40, 160, 0.4);
+  --nav-bg: rgba(251, 250, 255, 0.7);
+  --nav-line: rgba(40, 20, 120, 0.06);
+  --btn-primary-bg: linear-gradient(135deg, #6d4aff 0%, #a54bff 55%, #ff6f91 100%);
+  --btn-primary-shadow: 0 12px 30px -12px rgba(109, 74, 255, 0.7);
+  --btn-secondary-bg: rgba(255, 255, 255, 0.85);
+  --btn-secondary-fg: #5b35f5;
+  --btn-secondary-shadow: inset 0 0 0 1px rgba(40, 20, 120, 0.14);
+  --input-bg: rgba(255, 255, 255, 0.9);
+  --input-border: 1px solid rgba(40, 20, 120, 0.12);
+  --stage-bg: transparent;
+  --stage-radius: 40px;
+  --em-font: "Instrument Serif", "Pretendard", Georgia, serif;
+  --em-style: italic;
+  --em-weight: 400;
+  --em-color: transparent;
+  --em-bg: linear-gradient(95deg, #6d4aff 10%, #c04dff 50%, #ff6f91 90%);
+  --em-clip: text;
+  --em2-color: #120f2a;
+  --kicker-bg: rgba(255, 255, 255, 0.8);
+  --how-bg: rgba(255, 255, 255, 0.6);
+  --how-border: 1px solid rgba(40, 20, 120, 0.07);
+  --float-bg: rgba(255, 255, 255, 0.72);
+  --art-bg: radial-gradient(circle at 30% 20%, #ffffff, transparent 60%), linear-gradient(140deg, #efe9ff, #ffe8f1 55%, #e2f5ff);
+  --art-shadow: rgba(109, 74, 255, 0.22);
+  --ga-top: #ffffff;
+  --ga-bottom: #ece6ff;
+  --ga-stroke: #ddd4fb;
+  --ga-bracket: #c9c0ea;
+  --ga-ring: #e0d8fb;
+  --ga-fan-in: #ffffff;
+  --ga-fan-out: #ddd3fb;
+  --ga-blade: #ffffff;
+  --ga-hub: #ffffff;
+  --brand-bg: linear-gradient(135deg, #6d4aff, #ff6f91);
+  --brand-a: #ffffff;
+  --brand-b: #ffd1de;
+  --brand-core: #ffffff;
+  --toast-bg: #120f2a;
+}
+[data-look="aurora"] .brand-mark-bg { fill: #7b4dff; }
+[data-look="aurora"] .card,
+[data-look="aurora"] .stat,
+[data-look="aurora"] .listing,
+[data-look="aurora"] .scenario,
+[data-look="aurora"] .sign-hero {
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+[data-look="aurora"] .hero { grid-template-columns: 1fr; justify-items: center; text-align: center; padding-top: 64px; gap: 16px; }
+[data-look="aurora"] .hero-copy { display: flex; flex-direction: column; align-items: center; }
+[data-look="aurora"] .hero-title { font-size: clamp(44px, 6vw, 78px); }
+[data-look="aurora"] .hero-title em { padding-right: 0.06em; font-size: 1.08em; letter-spacing: -0.02em; }
+[data-look="aurora"] .hero-title em.alt { font-family: var(--em-font); font-style: italic; font-weight: 400; }
+[data-look="aurora"] .hero-lede { margin-inline: auto; max-width: 560px; }
+[data-look="aurora"] .hero-cta, [data-look="aurora"] .hero-trust { justify-content: center; }
+[data-look="aurora"] .hero-visual { width: min(100%, 1040px); }
+[data-look="aurora"] .hero-stage { height: clamp(380px, 40vw, 520px); isolation: isolate; }
+[data-look="aurora"] .hero-stage::before {
+  content: "";
+  position: absolute;
+  inset: 8% 14%;
+  z-index: -1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(109, 74, 255, 0.55), transparent 55%),
+    radial-gradient(circle at 70% 45%, rgba(255, 111, 145, 0.5), transparent 55%),
+    radial-gradient(circle at 50% 75%, rgba(69, 196, 255, 0.45), transparent 55%);
+  filter: blur(46px);
+  animation: aurora-drift 14s ease-in-out infinite alternate;
+}
+[data-look="aurora"] .float-offer { left: 2%; top: 22%; }
+[data-look="aurora"] .float-sign { right: 2%; bottom: 18%; }
+[data-look="aurora"] .how-n { background: var(--btn-primary-bg); }
+[data-look="aurora"] .page-head { text-align: center; }
+[data-look="aurora"] .page-head .eyebrow { justify-content: center; }
+[data-look="aurora"] .page-head h1 { font-size: clamp(32px, 4vw, 52px); }
+[data-look="aurora"] .page-lede { margin-inline: auto; }
+[data-look="aurora"] .hash-die-bit { fill: #7b4dff; }
+[data-look="aurora"] .doc-total { background: linear-gradient(135deg, #efe9ff, #ffe9f1); }
+@keyframes aurora-drift {
+  0% { transform: translate(-4%, 0) scale(1); }
+  50% { transform: translate(3%, -4%) scale(1.08); }
+  100% { transform: translate(5%, 3%) scale(0.96); }
+}
+
+/* ════════════ 시안 C · Graphite — 절제된 다크 · 유리 패널 ════════════ */
+[data-look="graphite"] {
+  color-scheme: dark;
+  --bg: #08090a;
+  --bg-image:
+    radial-gradient(900px 520px at 72% -12%, rgba(139, 124, 255, 0.2), transparent 62%),
+    radial-gradient(760px 420px at -6% 6%, rgba(94, 139, 255, 0.1), transparent 60%);
+  --surface: #131417;
+  --card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018));
+  --surface-2: rgba(255, 255, 255, 0.055);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.18);
+  --fg: #f7f8f8;
+  --fg-2: #b4b8c0;
+  --fg-3: #767b85;
+  --accent: #8b7cff;
+  --accent-ink: #b1a7ff;
+  --accent-soft: rgba(139, 124, 255, 0.15);
+  --on-accent: #ffffff;
+  --buyer: #6f9bff;
+  --buyer-soft: rgba(111, 155, 255, 0.15);
+  --seller: #f5a860;
+  --seller-soft: rgba(245, 168, 96, 0.15);
+  --pass: #4cc38a;
+  --pass-soft: rgba(76, 195, 138, 0.14);
+  --warn: #f2c14e;
+  --warn-soft: rgba(242, 193, 78, 0.14);
+  --block: #ff6369;
+  --block-soft: rgba(255, 99, 105, 0.14);
+  --font: "Geist", "Geist Sans", "Pretendard", -apple-system, system-ui, sans-serif;
+  --font-display: var(--font);
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  --display-weight: 600;
+  --display-tracking: -0.045em;
+  --num-weight: 600;
+  --card-title-weight: 600;
+  --brand-weight: 600;
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-pill: 999px;
+  --btn-radius: 10px;
+  --card-border: 1px solid rgba(255, 255, 255, 0.08);
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-pop: 0 24px 60px -20px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --shadow-seg: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  --nav-bg: rgba(8, 9, 10, 0.72);
+  --nav-line: rgba(255, 255, 255, 0.06);
+  --btn-primary-bg: #f7f8f8;
+  --btn-primary-fg: #08090a;
+  --btn-primary-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 24px -10px rgba(139, 124, 255, 0.6);
+  --btn-secondary-bg: rgba(255, 255, 255, 0.06);
+  --btn-secondary-fg: #f7f8f8;
+  --btn-secondary-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --input-border: 1px solid rgba(255, 255, 255, 0.1);
+  --stage-bg: radial-gradient(circle at 50% 42%, rgba(139, 124, 255, 0.24), transparent 58%), radial-gradient(circle at 50% 110%, rgba(111, 155, 255, 0.18), transparent 50%), #0b0c0f;
+  --stage-border: 1px solid rgba(255, 255, 255, 0.08);
+  --stage-radius: 18px;
+  --em-color: #b1a7ff;
+  --em2-color: #ffffff;
+  --kicker-bg: rgba(139, 124, 255, 0.12);
+  --how-bg: rgba(255, 255, 255, 0.03);
+  --how-border: 1px solid rgba(255, 255, 255, 0.07);
+  --how-n-radius: 8px;
+  --float-bg: rgba(19, 20, 23, 0.72);
+  --tab-active-bg: rgba(255, 255, 255, 0.08);
+  --tab-hover: rgba(255, 255, 255, 0.05);
+  --offer-active-bg: rgba(139, 124, 255, 0.08);
+  --avatar-radius: 10px;
+  --art-bg: radial-gradient(circle at 50% 30%, rgba(139, 124, 255, 0.18), transparent 60%), #0d0e11;
+  --art-shadow: rgba(0, 0, 0, 0.6);
+  --ga-top: #2a2c32;
+  --ga-bottom: #16171b;
+  --ga-stroke: #3a3d45;
+  --ga-bracket: #50545d;
+  --ga-ring: #3a3d45;
+  --ga-fan-in: #1c1d21;
+  --ga-fan-out: #0c0d10;
+  --ga-blade: #2d2f36;
+  --ga-hub: #3a3d45;
+  --brand-bg: #f7f8f8;
+  --brand-a: #8b7cff;
+  --brand-b: #f5a860;
+  --brand-core: #08090a;
+  --toast-bg: #f7f8f8;
+  --toast-fg: #08090a;
+  --doc-total-bg: linear-gradient(135deg, rgba(139, 124, 255, 0.16), rgba(111, 155, 255, 0.06));
+}
+[data-look="graphite"] .hero-title {
+  background: linear-gradient(180deg, #ffffff 35%, #9aa0ab 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+[data-look="graphite"] .hero-title em { color: var(--accent-ink); -webkit-text-fill-color: #b1a7ff; }
+[data-look="graphite"] .hero-title em.alt { -webkit-text-fill-color: transparent; }
+[data-look="graphite"] .hero-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(circle at 50% 60%, #000 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(circle at 50% 60%, #000 20%, transparent 70%);
+}
+[data-look="graphite"] .card::before,
+[data-look="graphite"] .stat::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(400px 120px at 20% 0%, rgba(139, 124, 255, 0.07), transparent 70%);
+}
+[data-look="graphite"] .stat { position: relative; }
+[data-look="graphite"] .pill.tone-pass, [data-look="graphite"] .pill.tone-block, [data-look="graphite"] .pill.tone-warn, [data-look="graphite"] .pill.tone-info { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 25%, transparent); }
+[data-look="graphite"] .lookbar { border-bottom: 1px solid rgba(255, 255, 255, 0.06); background: #000; }
+
+/* ════════════ 시안 D · Studio — 하드웨어 제품 같은 무광 그레이 · 오렌지 ════════════ */
+[data-look="studio"] {
+  color-scheme: light;
+  --bg: #e7e7e3;
+  --bg-image: radial-gradient(rgba(17, 17, 17, 0.11) 1px, transparent 1.3px);
+  --surface: #f6f6f3;
+  --surface-2: #e2e2de;
+  --line: rgba(17, 17, 17, 0.12);
+  --line-2: rgba(17, 17, 17, 0.32);
+  --fg: #111111;
+  --fg-2: #3f3f3c;
+  --fg-3: #75756f;
+  --accent: #ff5a1f;
+  --accent-ink: #d9430c;
+  --accent-soft: #ffe1d3;
+  --on-accent: #111111;
+  --buyer: #2458ff;
+  --buyer-soft: #dde4ff;
+  --seller: #ff5a1f;
+  --seller-ink: #cf3f08;
+  --seller-soft: #ffe1d3;
+  --pass: #1a9a52;
+  --pass-soft: #d3ecdc;
+  --warn: #d38b00;
+  --warn-ink: #a56c00;
+  --warn-soft: #f4e4bd;
+  --block: #e2311d;
+  --block-soft: #f8d7d1;
+  --font: "Pretendard", -apple-system, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Bricolage Grotesque Variable", "Pretendard", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-eyebrow: "JetBrains Mono", "Pretendard", monospace;
+  --eyebrow-case: uppercase;
+  --eyebrow-tracking: 0.04em;
+  --display-weight: 800;
+  --display-tracking: -0.04em;
+  --num-weight: 800;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+  --btn-radius: 999px;
+  --card-border: 1.5px solid #111111;
+  --shadow-card: none;
+  --shadow-pop: 5px 5px 0 #111111;
+  --shadow-seg: 0 0 0 1.5px #111111;
+  --seg-border: 1.5px solid #111111;
+  --nav-bg: rgba(231, 231, 227, 0.9);
+  --nav-line: #111111;
+  --btn-primary-bg: #111111;
+  --btn-primary-fg: #ffffff;
+  --btn-secondary-bg: #f6f6f3;
+  --btn-secondary-fg: #111111;
+  --btn-secondary-shadow: inset 0 0 0 1.5px #111111;
+  --input-bg: #ffffff;
+  --input-border: 1.5px solid #111111;
+  --stage-bg: radial-gradient(rgba(17, 17, 17, 0.12) 1px, transparent 1.3px) 0 0 / 16px 16px, #f1f1ed;
+  --stage-border: 1.5px solid #111111;
+  --stage-radius: 26px;
+  --stage-shadow: 8px 8px 0 #111111;
+  --em-color: #ff5a1f;
+  --em2-color: #111111;
+  --kicker-bg: #111111;
+  --how-bg: #f6f6f3;
+  --how-border: 1.5px solid #111111;
+  --how-n-radius: 8px;
+  --tab-active-bg: #111111;
+  --tab-active-fg: #ffffff;
+  --tab-hover: rgba(17, 17, 17, 0.08);
+  --avatar-radius: 10px;
+  --art-bg: radial-gradient(rgba(17, 17, 17, 0.1) 1px, transparent 1.3px) 0 0 / 14px 14px, #efefeb;
+  --art-shadow: rgba(17, 17, 17, 0.25);
+  --ga-top: #dcdcd7;
+  --ga-bottom: #c7c7c1;
+  --ga-stroke: #111111;
+  --ga-bracket: #9a9a94;
+  --ga-ring: #111111;
+  --ga-fan-in: #3a3a38;
+  --ga-fan-out: #1a1a19;
+  --ga-blade: #4a4a47;
+  --ga-hub: #ff5a1f;
+  --brand-bg: #ff5a1f;
+  --brand-a: #111111;
+  --brand-b: #ffffff;
+  --brand-core: #111111;
+  --toast-bg: #111111;
+  --doc-total-bg: #ffe1d3;
+}
+[data-look="studio"] .app { background-size: 18px 18px; }
+[data-look="studio"] .hero-kicker { color: #fff; }
+[data-look="studio"] .hero-kicker-dot { box-shadow: none; }
+[data-look="studio"] .hero-title { font-size: clamp(40px, 4.6vw, 62px); line-height: 1.06; }
+[data-look="studio"] .hero-title em.alt { text-decoration: underline; text-decoration-color: #ff5a1f; text-decoration-thickness: 0.1em; text-underline-offset: 0.08em; }
+[data-look="studio"] .eyebrow { color: var(--fg); font-size: 12.5px; }
+[data-look="studio"] .how-n { color: #111; }
+[data-look="studio"] .card-head h2, [data-look="studio"] .section-title h2, [data-look="studio"] .doc-head h2 { letter-spacing: -0.03em; }
+[data-look="studio"] .stat b:not(.muted), [data-look="studio"] .float-card strong, [data-look="studio"] .doc-total strong { font-family: var(--font-mono); letter-spacing: -0.04em; font-weight: 800; }
+[data-look="studio"] .btn-primary { box-shadow: 3px 3px 0 #ff5a1f; }
+[data-look="studio"] .btn-primary:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 #ff5a1f; filter: none; }
+[data-look="studio"] .listing:hover, [data-look="studio"] .offer-item:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 #111; }
+[data-look="studio"] .offer-item { border: 1.5px solid #111; background: #fff; }
+[data-look="studio"] .offer-item.is-active { border-color: #111; background: #ffe1d3; box-shadow: 4px 4px 0 #111; }
+[data-look="studio"] .offer-radio.on { border-color: #111; }
+[data-look="studio"] .pill { box-shadow: inset 0 0 0 1.5px currentColor; }
+[data-look="studio"] .role-chip, [data-look="studio"] .chip { box-shadow: inset 0 0 0 1.5px currentColor; }
+[data-look="studio"] .steps li { background: #fff; box-shadow: inset 0 0 0 1.5px rgba(17, 17, 17, 0.2); }
+[data-look="studio"] .msg { border: 1.5px solid #111; }
+[data-look="studio"] .lookbar { background: #111; }
+[data-look="studio"] .hero-stage::after {
+  content: "REC · 3D";
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  padding: 4px 10px 4px 22px;
+  border-radius: 999px;
+  border: 1.5px solid #111;
+  background: #fff radial-gradient(circle at 11px 50%, #ff5a1f 4px, transparent 4.5px);
+  font: 700 11px/1.2 "JetBrains Mono", monospace;
+  letter-spacing: 0.06em;
+  color: #111;
+}
+[data-look="studio"] .gpu-controls { border: 1.5px solid #111; box-shadow: 3px 3px 0 #111; background: #fff; }
+[data-look="studio"] .gpu-controls button.is-on { background: #111; color: #fff; }

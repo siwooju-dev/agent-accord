@@ -1,5 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import type { GpuHotspot } from "./components/GpuScene";
+import { GpuArt } from "./components/GpuArt";
+import { HashDie } from "./components/HashDie";
 import { Icon } from "./components/Icon";
+import { PriceRuler, type RulerRow } from "./components/PriceRuler";
 import {
   DEMO_BUYER_INTENT,
   DEMO_EVIDENCE,
@@ -11,84 +15,123 @@ import {
 import {
   approvalPayloadMatches,
   createAgreementSnapshot,
+  inspectOffer,
   mockWalletAddress,
   validateOffers,
 } from "./lib/mockApi";
-import type { AuditEvent, BuyerIntent, PageKey, UserRole } from "./types";
+import { LOOKS, lookById, readStoredLook, storeLook, type LookId } from "./looks";
+import type { AgreementSnapshot, AuditEvent, BuyerIntent, Evidence, Listing, PageKey, UserRole } from "./types";
 import "./App.css";
 
-const nav: {
-  id: PageKey;
-  label: string;
-  icon: "overview" | "conditions" | "negotiation" | "agreement" | "audit";
-}[] = [
-  { id: "overview", label: "협상 개요", icon: "overview" },
-  { id: "conditions", label: "조건 · 매물", icon: "conditions" },
-  { id: "negotiation", label: "협상 라운드", icon: "negotiation" },
-  { id: "agreement", label: "합의 · 승인", icon: "agreement" },
-  { id: "audit", label: "감사 로그", icon: "audit" },
+const GpuScene = lazy(() => import("./components/GpuScene").then((m) => ({ default: m.GpuScene })));
+
+type Evaluation = ReturnType<typeof validateOffers>[number];
+
+const nav: { id: PageKey; label: string }[] = [
+  { id: "overview", label: "개요" },
+  { id: "conditions", label: "조건 · 매물" },
+  { id: "negotiation", label: "협상" },
+  { id: "agreement", label: "합의 · 서명" },
+  { id: "audit", label: "기록" },
 ];
-const titles: Record<PageKey, string> = {
-  overview: "협상 개요",
-  conditions: "조건과 매물",
-  negotiation: "협상 라운드",
-  agreement: "합의안과 승인",
-  audit: "감사 로그",
+
+const pageCopy: Record<Exclude<PageKey, "overview">, { eyebrow: string; title: string; lede: string }> = {
+  conditions: {
+    eyebrow: "Step 1 · 조건",
+    title: "살 조건을 정하고 매물을 비교해요",
+    lede: "예산과 배송 기한은 나에게만 보여요. 에이전트는 이 조건 안에서만 흥정합니다.",
+  },
+  negotiation: {
+    eyebrow: "Step 2 · 협상",
+    title: "에이전트가 흥정하고, 서버가 검사해요",
+    lede: "모든 제안은 같은 규칙으로 검사돼요. 에이전트의 설명은 참고용이고 통과 여부는 서버 코드가 정합니다.",
+  },
+  agreement: {
+    eyebrow: "Step 3 · 합의",
+    title: "같은 합의서에 두 사람이 서명해요",
+    lede: "구매자와 판매자가 똑같은 스냅샷 해시에 각자 서명해야 거래가 확정돼요. 한쪽 승인만으로는 끝나지 않습니다.",
+  },
+  audit: {
+    eyebrow: "기록",
+    title: "모든 판단을 시간순으로 남겨요",
+    lede: "누가 무엇을 입력했고 서버가 어떻게 판정했는지 확인할 수 있어요. 로컬 데모 로그예요.",
+  },
 };
+
 const money = (n: number) => "₩" + new Intl.NumberFormat("ko-KR").format(n);
 const date = (value: string) =>
-  new Date(value + (value.length === 10 ? "T12:00:00" : "")).toLocaleDateString(
-    "ko-KR",
-    { month: "long", day: "numeric" },
-  );
+  new Date(value + (value.length === 10 ? "T12:00:00" : "")).toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
+const evidenceTone: Record<Evidence["status"], GpuHotspot["tone"]> = {
+  checked: "pass",
+  seller_claimed: "warn",
+  conflicted: "block",
+  unknown: "idle",
+};
+const evidenceLabel: Record<Evidence["status"], string> = {
+  checked: "확인됨",
+  seller_claimed: "판매자 주장",
+  conflicted: "정보가 서로 달라요",
+  unknown: "아직 확인 안 됨",
+};
+const reasonKo: Record<string, string> = {
+  BUDGET_EXCEEDED: "예산 초과",
+  DELIVERY_DEADLINE: "배송 기한 초과",
+  TOTAL_MISMATCH: "총액 불일치",
+};
 
 function App() {
+  const [look, setLook] = useState<LookId>(readStoredLook);
   const [page, setPage] = useState<PageKey>("overview");
   const [role, setRole] = useState<UserRole>("buyer");
   const [intent, setIntent] = useState<BuyerIntent>(DEMO_BUYER_INTENT);
   const [modelDraft, setModelDraft] = useState(intent.gpuModel);
   const [budgetDraft, setBudgetDraft] = useState(String(intent.maxTotalKrw));
   const [deadlineDraft, setDeadlineDraft] = useState(intent.deliveryDeadline);
-  const [mustHaveDraft, setMustHaveDraft] = useState(
-    intent.mustHave.join(", "),
-  );
+  const [mustHaveDraft, setMustHaveDraft] = useState(intent.mustHave.join(", "));
   const [sellerMinimum, setSellerMinimum] = useState("1940000");
   const [sellerPrice, setSellerPrice] = useState("2060000");
   const [selectedId, setSelectedId] = useState("offer-02");
   const [buyerSigned, setBuyerSigned] = useState(false);
   const [sellerSigned, setSellerSigned] = useState(false);
   const [rejected, setRejected] = useState(false);
-  const [connected, setConnected] = useState<Record<UserRole, boolean>>({
-    buyer: false,
-    seller: false,
-  });
-  const [checked, setChecked] = useState<Record<UserRole, boolean>>({
-    buyer: false,
-    seller: false,
-  });
+  const [connected, setConnected] = useState<Record<UserRole, boolean>>({ buyer: false, seller: false });
+  const [checked, setChecked] = useState<Record<UserRole, boolean>>({ buyer: false, seller: false });
   const [events, setEvents] = useState<AuditEvent[]>(INITIAL_AUDIT_EVENTS);
   const [toast, setToast] = useState("");
   const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => storeLook(look), [look]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const index = ["1", "2", "3", "4"].indexOf(event.key);
+      if (index >= 0) setLook(LOOKS[index].id);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
     return () => window.clearInterval(timer);
   }, []);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 4800);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [page]);
 
-  const evaluations = useMemo(
-    () => validateOffers(DEMO_OFFERS, intent),
-    [intent],
-  );
+  const evaluations = useMemo(() => validateOffers(DEMO_OFFERS, intent), [intent]);
   const visibleEvaluations =
-    role === "seller"
-      ? evaluations.filter((item) => item.offer.listingId === "listing-02")
-      : evaluations;
-  const selected =
-    evaluations.find((item) => item.offer.id === selectedId) ?? evaluations[0];
+    role === "seller" ? evaluations.filter((item) => item.offer.listingId === "listing-02") : evaluations;
+  const selected = evaluations.find((item) => item.offer.id === selectedId) ?? evaluations[0];
   const offer = selected?.offer;
-  const listing = offer
-    ? DEMO_LISTINGS.find((item) => item.id === offer.listingId)
-    : undefined;
-  const snapshot = offer ? createAgreementSnapshot(offer) : null;
+  const listing = offer ? DEMO_LISTINGS.find((item) => item.id === offer.listingId) : undefined;
+  const snapshot = useMemo(() => (offer ? createAgreementSnapshot(offer) : null), [offer]);
   const matches = approvalPayloadMatches(snapshot, offer);
   const expired = Boolean(offer && new Date(offer.expiresAt).getTime() <= now);
   const bothSigned = buyerSigned && sellerSigned;
@@ -103,50 +146,18 @@ function App() {
           : buyerSigned || sellerSigned
             ? "AWAITING_APPROVALS"
             : "PROPOSED";
-  const address = snapshot
-    ? mockWalletAddress(
-        role,
-        role === "seller" ? "seller-02" : listing?.sellerId,
-      )
-    : "";
-  const expected = snapshot
-    ? role === "buyer"
-      ? snapshot.buyerWallet
-      : snapshot.sellerWallet
-    : "";
+  const address = snapshot ? mockWalletAddress(role, role === "seller" ? "seller-02" : listing?.sellerId) : "";
+  const expected = snapshot ? (role === "buyer" ? snapshot.buyerWallet : snapshot.sellerWallet) : "";
   const addressMatches = address.toLowerCase() === expected.toLowerCase();
   const signed = role === "buyer" ? buyerSigned : sellerSigned;
   const canSign = Boolean(
-    selected?.status === "valid" &&
-    !expired &&
-    !rejected &&
-    !signed &&
-    connected[role] &&
-    checked[role] &&
-    matches &&
-    addressMatches,
+    selected?.status === "valid" && !expired && !rejected && !signed && connected[role] && checked[role] && matches && addressMatches,
   );
-  const title = titles[page];
 
-  function log(
-    actor: string,
-    eventType: string,
-    decision: AuditEvent["decision"],
-    detail: string,
-  ) {
-    const at = new Date()
-      .toLocaleString("sv-SE", { timeZone: "Asia/Seoul", hour12: false })
-      .replace("T", " ");
+  function log(actor: string, eventType: string, decision: AuditEvent["decision"], detail: string) {
+    const at = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Seoul", hour12: false }).replace("T", " ");
     setEvents((current) => [
-      {
-        id: "event-" + Date.now(),
-        at,
-        actor,
-        eventType,
-        decision,
-        detail: detail + " · demo/mock",
-        source: "demo/mock",
-      },
+      { id: "event-" + Date.now(), at, actor, eventType, decision, detail: detail + " · demo/mock", source: "demo/mock" },
       ...current,
     ]);
   }
@@ -169,17 +180,12 @@ function App() {
         .filter(Boolean),
     });
     resetApprovals();
-    log(
-      "구매자",
-      "INTENT_UPDATED",
-      "info",
-      "조건 변경 · 이전 승인을 초기화했습니다.",
-    );
-    setToast("조건을 저장했습니다. 이전 승인은 초기화됐습니다.");
+    log("구매자", "INTENT_UPDATED", "info", "조건 변경 · 이전 승인을 초기화했습니다.");
+    setToast("조건을 저장했어요. 이전 승인은 초기화하고 모든 제안을 다시 검사했어요.");
   }
   function scenario(which: "A" | "B" | "C") {
     if (role === "seller") {
-      setToast("구매 조건 변경은 구매자 데모에서만 사용할 수 있습니다.");
+      setToast("구매 조건 변경은 구매자 화면에서만 할 수 있어요.");
       return;
     }
     const next =
@@ -199,13 +205,9 @@ function App() {
       "데모 시나리오",
       "CONDITION_RECHECKED",
       "info",
-      which === "A"
-        ? "기본 조건 적용"
-        : which === "B"
-          ? "예산 변경 후 제안 재검사"
-          : "기한 변경 후 제안 재검사",
+      which === "A" ? "기본 조건 적용" : which === "B" ? "예산 변경 후 제안 재검사" : "기한 변경 후 제안 재검사",
     );
-    setToast("조건을 바꿨습니다. 차단 이유를 확인하세요.");
+    setToast(which === "A" ? "기본 조건으로 돌렸어요." : "조건을 바꿨어요. 어떤 제안이 막히는지 확인해보세요.");
   }
   function switchRole(next: UserRole) {
     if (next === "seller" && selectedId !== "offer-02") {
@@ -216,32 +218,28 @@ function App() {
   }
   function chooseOffer(id: string) {
     if (id === selectedId) return;
+    if (role === "seller" && id !== "offer-02") return;
     setSelectedId(id);
     resetApprovals();
     log(role, "OFFER_SELECTED", "info", "합의 스냅샷 변경 · 이전 승인 초기화");
-    setToast("다른 제안을 선택해 이전 승인을 초기화했습니다.");
+    setToast("다른 제안을 골랐어요. 합의서가 바뀌어 이전 승인은 초기화됐어요.");
   }
   function connectWallet() {
     if (!matches || !addressMatches) {
-      setToast("주소가 합의 스냅샷과 다릅니다.");
+      setToast("지갑 주소가 합의서와 달라요.");
       return;
     }
     setConnected((value) => ({ ...value, [role]: true }));
     setChecked((value) => ({ ...value, [role]: false }));
     log(role, "DEMO_WALLET_CONNECTED", "info", "데모 지갑 주소 확인");
-    setToast("데모 주소를 연결했습니다. 실제 지갑은 연결하지 않았습니다.");
+    setToast("데모 지갑을 연결했어요. 실제 지갑은 연결하지 않았어요.");
   }
   function sign() {
     if (!canSign) return;
     if (role === "buyer") setBuyerSigned(true);
     else setSellerSigned(true);
-    log(
-      role,
-      "DEMO_APPROVAL_SUBMITTED",
-      "pending",
-      "사용자가 합의 스냅샷 확인 후 데모 승인",
-    );
-    setToast("데모 승인 입력을 기록했습니다. 체인 영수증은 없습니다.");
+    log(role, "DEMO_APPROVAL_SUBMITTED", "pending", "사용자가 합의 스냅샷 확인 후 데모 승인");
+    setToast("데모 서명을 남겼어요. 실제 체인 기록은 아직 없어요.");
   }
   function reject() {
     if (!selected || selected.status !== "valid" || bothSigned) return;
@@ -250,213 +248,157 @@ function App() {
     setSellerSigned(false);
     setChecked({ buyer: false, seller: false });
     log(role, "AGREEMENT_REJECTED", "rejected", "합의 거절");
-    setToast("합의안을 거절했습니다.");
+    setToast("합의를 거절했어요.");
   }
   function saveSeller(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    log(
-      "판매자 셀러 02",
-      "LISTING_DRAFT_SAVED",
-      "info",
-      "매물 초안 브라우저 임시 저장",
-    );
-    setToast("매물 초안은 이 브라우저 데모에만 저장했습니다.");
+    log("판매자 셀러 02", "LISTING_DRAFT_SAVED", "info", "매물 초안 브라우저 임시 저장");
+    setToast("매물 초안을 이 브라우저에만 임시 저장했어요.");
   }
 
+  const current = lookById(look);
+  const hotspots: GpuHotspot[] = listing
+    ? [
+        ...DEMO_EVIDENCE.filter((item) => listing.evidenceIds.includes(item.id)).map(
+          (item, index): GpuHotspot => ({
+            id: item.id,
+            anchor: index === 0 ? "fan" : "back",
+            title: item.label,
+            detail: evidenceLabel[item.status],
+            tone: evidenceTone[item.status],
+          }),
+        ),
+        { id: "warranty", anchor: "bracket", title: "제조사 보증", detail: `${date(listing.warrantyEnd)}까지 · 판매자 주장`, tone: "warn" },
+      ]
+    : [];
+
   return (
-    <div className="app-frame">
-      <aside className="sidebar">
-        <button
-          className="brand"
-          type="button"
-          onClick={() => setPage("overview")}
-        >
-          <span className="brand-mark">
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-          <span>
-            <b>accord</b>
-            <small>PRIVATE NEGOTIATION</small>
-          </span>
+    <div className="app">
+      <LookBar look={look} setLook={setLook} />
+      <header className="nav">
+        <button className="brand" type="button" onClick={() => setPage("overview")} aria-label="개요로 이동">
+          <BrandMark />
+          <span>Accord</span>
         </button>
-        <div className="workspace-select">
-          <span className="workspace-avatar">A</span>
-          <span>
-            <b>GPU 구매 협상</b>
-            <small>개인 데모 워크스페이스</small>
-          </span>
-          <Icon name="chevron" size={15} />
-        </div>
-        <p className="nav-caption">워크스페이스</p>
-        <nav className="nav-list" aria-label="주요 화면">
+        <nav className="tabs" aria-label="주요 화면">
           {nav.map((item) => (
             <button
               key={item.id}
               type="button"
-              className={"nav-item" + (page === item.id ? " active" : "")}
+              className={"tab" + (page === item.id ? " is-active" : "")}
               onClick={() => setPage(item.id)}
               aria-current={page === item.id ? "page" : undefined}
             >
-              <Icon name={item.icon} size={17} />
-              <span>{item.label}</span>
-              {item.id === "agreement" &&
-                buyerSigned !== sellerSigned &&
-                !rejected && <i className="nav-ping" />}
+              {item.label}
+              {item.id === "agreement" && buyerSigned !== sellerSigned && !rejected && <i className="tab-dot" aria-label="상대 서명 대기" />}
             </button>
           ))}
         </nav>
-        <div className="sidebar-spacer" />
-        <div className="connection-card">
-          <span>
-            <i className="status-dot muted" /> 외부 연결 <b>미연결</b>
-          </span>
-          <p>
-            KILN API <small>미연결</small>
-          </p>
-          <p>
-            테스트넷 <small>미연결</small>
-          </p>
-          <p>
-            지갑 <small>데모 전용</small>
-          </p>
+        <div className="nav-tools">
+          <span className="mock-badge">Demo · mock</span>
+          <a className="live-link" href="?mode=live">
+            실제 API
+          </a>
+          <div className="role-switch" role="group" aria-label="보는 사람">
+            <button className={role === "buyer" ? "is-on" : ""} onClick={() => switchRole("buyer")} aria-pressed={role === "buyer"}>
+              <i className="dot buyer" /> 구매자
+            </button>
+            <button className={role === "seller" ? "is-on" : ""} onClick={() => switchRole("seller")} aria-pressed={role === "seller"}>
+              <i className="dot seller" /> 판매자
+            </button>
+          </div>
         </div>
-        <div className="sidebar-user">
-          <span className="user-avatar">{role === "buyer" ? "구" : "셀"}</span>
-          <span>
-            <b>{role === "buyer" ? "구매자 데모" : "판매자 데모"}</b>
-            <small>
-              {role === "buyer" ? "buyer · demo" : "seller-02 · demo"}
-            </small>
-          </span>
-          <span>···</span>
-        </div>
-      </aside>
-      <div className="main-shell">
-        <header className="topbar">
-          <div className="breadcrumbs">
-            워크스페이스 <span>/</span> <b>{title}</b>
-          </div>
-          <div className="top-actions">
-            <a className="live-mode-link" href="?mode=live">실제 API 연결</a>
-            <span className="environment">
-              <i className="status-dot amber" /> DEMO / MOCK
-            </span>
-            <div
-              className="role-switch"
-              role="group"
-              aria-label="데모 사용자 역할"
-            >
-              <button
-                className={role === "buyer" ? "selected" : ""}
-                onClick={() => switchRole("buyer")}
-                aria-pressed={role === "buyer"}
-              >
-                구매자
-              </button>
-              <button
-                className={role === "seller" ? "selected" : ""}
-                onClick={() => switchRole("seller")}
-                aria-pressed={role === "seller"}
-              >
-                판매자
-              </button>
-            </div>
-          </div>
-        </header>
-        <main className="workspace">
-          <div className="page-heading">
-            <div>
-              <p className="eyebrow">ACCORD / {page.toUpperCase()}</p>
-              <h1>{title}</h1>
-              <p className="page-description">
-                조건, 제안, 양측 승인 진행 상황을 확인합니다.
-              </p>
-            </div>
-            <span className="flow-id">
-              <i /> FLOW-049
-            </span>
-          </div>
+      </header>
 
-          {page === "overview" && (
-            <Overview
-              role={role}
-              intent={role === "buyer" ? intent : null}
-              evaluations={visibleEvaluations}
-              status={status}
-              setPage={setPage}
-            />
-          )}
-          {page === "conditions" && (
-            <Conditions
-              role={role}
-              intent={intent}
-              model={modelDraft}
-              setModel={setModelDraft}
-              budget={budgetDraft}
-              setBudget={setBudgetDraft}
-              deadline={deadlineDraft}
-              setDeadline={setDeadlineDraft}
-              mustHave={mustHaveDraft}
-              setMustHave={setMustHaveDraft}
-              saveIntent={saveIntent}
-              sellerMinimum={sellerMinimum}
-              setSellerMinimum={setSellerMinimum}
-              sellerPrice={sellerPrice}
-              setSellerPrice={setSellerPrice}
-              saveSeller={saveSeller}
-            />
-          )}
-          {page === "negotiation" && (
-            <Negotiation
-              role={role}
-              evaluations={visibleEvaluations}
-              selectedId={selectedId}
-              setSelectedId={chooseOffer}
-              setPage={setPage}
-              scenario={scenario}
-            />
-          )}
-          {page === "agreement" && (
-            <Agreement
-              role={role}
-              listing={listing}
-              snapshot={snapshot}
-              evaluation={selected}
-              status={status}
-              expired={expired}
-              matches={matches}
-              address={address}
-              addressMatches={addressMatches}
-              connected={connected[role]}
-              checked={checked[role]}
-              signed={signed}
-              buyerSigned={buyerSigned}
-              sellerSigned={sellerSigned}
-              canSign={canSign}
-              bothSigned={bothSigned}
-              rejected={rejected}
-              connect={connectWallet}
-              setChecked={(value) =>
-                setChecked((old) => ({ ...old, [role]: value }))
-              }
-              sign={sign}
-              reject={reject}
-              setPage={setPage}
-            />
-          )}
-          {page === "audit" && <Audit events={events} />}
-          <footer className="workspace-footer">
-            <span>
-              <Icon name="lock" size={13} /> 비공개 가격 한계는 상대 역할에
-              표시하지 않습니다.
-            </span>
-            <span>UI prototype · local demo</span>
-          </footer>
-        </main>
-      </div>
+      <main className={"page page-" + page}>
+        {page !== "overview" && <PageHead page={page} role={role} />}
+        {page === "overview" && (
+          <Overview
+            role={role}
+            intent={intent}
+            evaluations={visibleEvaluations}
+            selectedId={selectedId}
+            chooseOffer={chooseOffer}
+            status={status}
+            buyerSigned={buyerSigned}
+            sellerSigned={sellerSigned}
+            setPage={setPage}
+            gpu={
+              <Suspense fallback={<div className="scene-loading">3D 모델 불러오는 중…</div>}>
+                <GpuScene palette={current.gpu} label={(listing?.model ?? "RTX 4090").toUpperCase()} hotspots={hotspots} />
+              </Suspense>
+            }
+            listing={listing}
+          />
+        )}
+        {page === "conditions" && (
+          <Conditions
+            role={role}
+            intent={intent}
+            model={modelDraft}
+            setModel={setModelDraft}
+            budget={budgetDraft}
+            setBudget={setBudgetDraft}
+            deadline={deadlineDraft}
+            setDeadline={setDeadlineDraft}
+            mustHave={mustHaveDraft}
+            setMustHave={setMustHaveDraft}
+            saveIntent={saveIntent}
+            sellerMinimum={sellerMinimum}
+            setSellerMinimum={setSellerMinimum}
+            sellerPrice={sellerPrice}
+            setSellerPrice={setSellerPrice}
+            saveSeller={saveSeller}
+            evaluations={evaluations}
+          />
+        )}
+        {page === "negotiation" && (
+          <Negotiation
+            role={role}
+            intent={intent}
+            evaluations={visibleEvaluations}
+            selectedId={selectedId}
+            setSelectedId={chooseOffer}
+            setPage={setPage}
+            scenario={scenario}
+          />
+        )}
+        {page === "agreement" && (
+          <Agreement
+            role={role}
+            listing={listing}
+            snapshot={snapshot}
+            evaluation={selected}
+            status={status}
+            expired={expired}
+            matches={matches}
+            address={address}
+            addressMatches={addressMatches}
+            connected={connected[role]}
+            checked={checked[role]}
+            signed={signed}
+            buyerSigned={buyerSigned}
+            sellerSigned={sellerSigned}
+            canSign={canSign}
+            bothSigned={bothSigned}
+            rejected={rejected}
+            connect={connectWallet}
+            setChecked={(value) => setChecked((old) => ({ ...old, [role]: value }))}
+            sign={sign}
+            reject={reject}
+            setPage={setPage}
+          />
+        )}
+        {page === "audit" && <Audit events={events} />}
+      </main>
+
+      <footer className="footer">
+        <span>
+          <Icon name="alert" size={13} /> {DEMO_NOTICE}
+        </span>
+        <span>Kiln · 테스트넷 · 실제 지갑 미연결 · UI 시안</span>
+      </footer>
+
       {toast && (
         <div className="toast" role="status" aria-live="polite">
           <Icon name="check" size={16} />
@@ -470,204 +412,375 @@ function App() {
   );
 }
 
+/* ───────────── design switcher (top bar) ───────────── */
+
+function LookBar({ look, setLook }: { look: LookId; setLook: (id: LookId) => void }) {
+  const current = lookById(look);
+  return (
+    <div className="lookbar" role="region" aria-label="디자인 시안 선택">
+      <span className="lookbar-label">디자인 시안</span>
+      <div className="lookbar-options" role="radiogroup" aria-label="시안">
+        {LOOKS.map((item, index) => (
+          <button
+            key={item.id}
+            type="button"
+            role="radio"
+            aria-checked={item.id === look}
+            className={"look-option" + (item.id === look ? " is-on" : "")}
+            onClick={() => setLook(item.id)}
+            title={`${item.name} · ${item.tagline} (키보드 ${index + 1})`}
+          >
+            <span className="look-swatch" aria-hidden="true">
+              {item.swatch.map((color) => (
+                <i key={color} style={{ background: color }} />
+              ))}
+            </span>
+            <b>
+              {item.key} · {item.name}
+            </b>
+          </button>
+        ))}
+      </div>
+      <span className="lookbar-note">
+        {current.tagline} <kbd>1</kbd>–<kbd>4</kbd>
+      </span>
+    </div>
+  );
+}
+
+function BrandMark() {
+  return (
+    <svg className="brand-mark" width="26" height="26" viewBox="0 0 28 28" aria-hidden="true">
+      <rect width="28" height="28" rx="8" className="brand-mark-bg" />
+      <path d="M8.5 14a5.5 5.5 0 0 1 5.5-5.5" className="brand-mark-buyer" />
+      <path d="M19.5 14a5.5 5.5 0 0 1-5.5 5.5" className="brand-mark-seller" />
+      <circle cx="14" cy="14" r="2.2" className="brand-mark-core" />
+    </svg>
+  );
+}
+
+function PageHead({ page, role }: { page: Exclude<PageKey, "overview">; role: UserRole }) {
+  const copy = pageCopy[page];
+  return (
+    <header className="page-head">
+      <p className="eyebrow">
+        {copy.eyebrow}
+        <span className={"role-chip " + role}>{role === "buyer" ? "구매자 화면" : "판매자 화면"}</span>
+      </p>
+      <h1>{copy.title}</h1>
+      <p className="page-lede">{copy.lede}</p>
+    </header>
+  );
+}
+
+function Card({ title, sub, action, className = "", children }: { title: string; sub?: string; action?: ReactNode; className?: string; children: ReactNode }) {
+  return (
+    <section className={"card " + className}>
+      <header className="card-head">
+        <div>
+          <h2>{title}</h2>
+          {sub && <p>{sub}</p>}
+        </div>
+        {action}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function StatusPill({ status }: { status: string }) {
+  const labels: Record<string, string> = {
+    PROPOSED: "서명 전",
+    AWAITING_APPROVALS: "한쪽 서명 완료",
+    RECORDING: "기록 대기",
+    RECORDED: "기록 완료",
+    CHAIN_FAILED: "기록 실패",
+    BLOCKED: "검사 차단",
+    REJECTED: "거절됨",
+    EXPIRED: "만료됨",
+  };
+  const tone =
+    status === "RECORDED"
+      ? "pass"
+      : status === "RECORDING" || status === "AWAITING_APPROVALS"
+        ? "info"
+        : ["BLOCKED", "REJECTED", "EXPIRED", "CHAIN_FAILED"].includes(status)
+          ? "block"
+          : "idle";
+  return (
+    <span className={"pill tone-" + tone}>
+      <i />
+      {labels[status] ?? status}
+    </span>
+  );
+}
+
+function EvidenceTag({ state }: { state: Evidence["status"] }) {
+  return (
+    <span className={"pill small tone-" + (state === "checked" ? "pass" : state === "seller_claimed" ? "warn" : state === "conflicted" ? "block" : "idle")}>
+      <i />
+      {evidenceLabel[state]}
+    </span>
+  );
+}
+
+function Verdict({ status, sellerMode = false, reason }: { status: Evaluation["status"]; sellerMode?: boolean; reason?: string }) {
+  return status === "valid" ? (
+    <span className="pill tone-pass">
+      <Icon name="check" size={12} /> 조건 통과
+    </span>
+  ) : (
+    <span className="pill tone-block">
+      <Icon name="alert" size={12} /> {sellerMode ? "정책 검사 차단" : (reasonKo[reason ?? ""] ?? "차단")}
+    </span>
+  );
+}
+
+/* ───────────── overview ───────────── */
+
 function Overview({
   role,
   intent,
   evaluations,
+  selectedId,
+  chooseOffer,
   status,
+  buyerSigned,
+  sellerSigned,
   setPage,
+  gpu,
+  listing,
 }: {
   role: UserRole;
-  intent: BuyerIntent | null;
-  evaluations: ReturnType<typeof validateOffers>;
+  intent: BuyerIntent;
+  evaluations: Evaluation[];
+  selectedId: string;
+  chooseOffer: (id: string) => void;
   status: string;
+  buyerSigned: boolean;
+  sellerSigned: boolean;
   setPage: (page: PageKey) => void;
+  gpu: ReactNode;
+  listing: Listing | undefined;
 }) {
-  const valid = evaluations.filter((item) => item.status === "valid").length;
+  const valid = evaluations.filter((item) => item.status === "valid");
+  const lowest = valid.length ? Math.min(...valid.map((item) => item.offer.totalKrw)) : null;
+  const selected = evaluations.find((item) => item.offer.id === selectedId);
   return (
-    <div className="page-stack">
+    <div className="overview">
       <section className="hero">
         <div className="hero-copy">
-          <span className="eyebrow">NEGOTIATION ROOM / 01</span>
-          <h2>
-            조건은 명확하게,
-            <br />
-            <em>승인은 사람의 손으로.</em>
-          </h2>
-          <p>
-            에이전트가 제안을 정리하고 서버가 조건을 검사합니다.
-            <br />
-            거래 기록은 양측이 같은 합의안에 승인한 뒤에 이어집니다.
+          <p className="hero-kicker">
+            <span className="hero-kicker-dot" /> 중고 GPU 거래 · AI 에이전트 협상
           </p>
-          <button
-            className="button button-light"
-            onClick={() => setPage("negotiation")}
-          >
-            협상 검토하기 <Icon name="arrow" size={15} />
-          </button>
-        </div>
-        <div className="hero-object">
-          <div className="hero-orbit" />
-          <div className="gpu-hero">
-            <span>ACCORD</span>
-            <i />
-            <i />
-            <b>RTX 4090</b>
-          </div>
-          <div className="hero-seal">
-            <Icon name="shield" size={18} />
-          </div>
-          <div className="hero-caption">
-            SAME SNAPSHOT
+          <h1 className="hero-title">
+            흥정은 <em>AI 에이전트</em>가,
             <br />
-            <b>DUAL APPROVAL</b>
+            결정은 <em className="alt">당신</em>이.
+          </h1>
+          <p className="hero-lede">
+            구매·판매 에이전트가 가격을 주고받는 동안 서버가 예산과 배송 기한을 넘는 제안을 막아요. 두 사람이 같은 합의서에 서명해야 거래가 확정됩니다.
+          </p>
+          <div className="hero-cta">
+            <button className="btn btn-primary" onClick={() => setPage("negotiation")}>
+              협상 보러 가기 <Icon name="arrow" size={15} />
+            </button>
+            <button className="btn btn-secondary" onClick={() => setPage("agreement")}>
+              합의서 보기
+            </button>
           </div>
+          <ul className="hero-trust">
+            <li>
+              <Icon name="shield" size={14} /> 서버 규칙 검사
+            </li>
+            <li>
+              <Icon name="lock" size={14} /> 비공개 한도 보호
+            </li>
+            <li>
+              <Icon name="agreement" size={14} /> 양측 서명
+            </li>
+          </ul>
         </div>
-        <div className="hero-foot">
-          <span>
-            <i /> {valid}개 제안이 현재 조건 통과
-          </span>
-          <StatusBadge status={status} />
+        <div className="hero-visual">
+          <div className="hero-stage">{gpu}</div>
+          {selected && listing && (
+            <div className="float-card float-offer">
+              <span className="float-label">선택한 제안</span>
+              <b>
+                {listing.sellerName} · {listing.model.replace("RTX 4090 ", "")}
+              </b>
+              <strong>{money(selected.offer.totalKrw)}</strong>
+              <Verdict status={selected.status} sellerMode={role === "seller"} reason={selected.reasonCode} />
+            </div>
+          )}
+          <div className="float-card float-sign">
+            <span className="float-label">서명</span>
+            <div className="float-sign-row">
+              <span className={"sig buyer" + (buyerSigned ? " on" : "")}>구매자</span>
+              <span className="sig-line" />
+              <span className={"sig seller" + (sellerSigned ? " on" : "")}>판매자</span>
+            </div>
+            <StatusPill status={status} />
+          </div>
         </div>
       </section>
-      <div className="stat-grid">
-        <Stat label="검토한 매물" value="03" sub="GPU · demo/mock" icon="box" />
-        <Stat
-          label="유효 제안"
-          value={String(valid).padStart(2, "0")}
-          sub="현재 조건 기준"
-          icon="check"
-        />
-        <Stat
-          label="협상 라운드"
-          value="02 / 03"
-          sub="최대 2회 반대 제안"
-          icon="negotiation"
-        />
-        <Stat
-          label="온체인 상태"
-          value="대기 중"
-          sub="테스트넷 미연결"
-          icon="network"
-        />
-      </div>
-      <div className="overview-grid">
-        <section className="panel">
-          <PanelHeading
-            label="NEGOTIATION FLOW"
-            title="진행 단계"
-            action={
-              <button
-                className="text-button"
-                onClick={() => setPage("agreement")}
-              >
-                합의 보기 <Icon name="arrow" size={13} />
-              </button>
-            }
-          />
-          <div className="flow-list">
-            <Flow
-              n="01"
-              title="조건 등록"
-              detail="구매자 의도 확인"
-              state="done"
-            />
-            <Flow
-              n="02"
-              title="제안 정리"
-              detail="후보 3개 · demo/mock"
-              state="done"
-            />
-            <Flow
-              n="03"
-              title="합의안 검토"
-              detail="사용자가 직접 결정"
-              state="now"
-            />
-            <Flow
-              n="04"
-              title="체인 기록"
-              detail="테스트넷 연결 대기"
-              state="later"
-            />
+
+      <section className="stats">
+        <div className="stat">
+          <span>조건을 통과한 제안</span>
+          <b>
+            {valid.length}
+            <small> / {evaluations.length}</small>
+          </b>
+        </div>
+        <div className="stat">
+          <span>가장 낮은 통과 제안</span>
+          <b>{lowest ? money(lowest) : "—"}</b>
+        </div>
+        <div className="stat">
+          <span>{role === "buyer" ? "내 예산까지 남은 금액" : "협상 라운드"}</span>
+          <b>{role === "buyer" ? (lowest ? money(intent.maxTotalKrw - lowest) : "—") : "2 / 3"}</b>
+        </div>
+        <div className="stat">
+          <span>체인 기록</span>
+          <b className="muted">대기 중</b>
+        </div>
+      </section>
+
+      <section className="how">
+        {[
+          { n: "1", t: "에이전트가 흥정해요", d: "구매자·판매자 에이전트가 각자의 비공개 한도 안에서 가격을 제안해요." },
+          { n: "2", t: "서버가 규칙으로 검사해요", d: "총액·예산·배송 기한·증빙을 코드로 확인하고 벗어난 제안은 막아요." },
+          { n: "3", t: "두 사람이 서명해요", d: "같은 합의서 해시에 양쪽이 서명해야 기록 단계로 넘어가요." },
+        ].map((step) => (
+          <div className="how-step" key={step.n}>
+            <span className="how-n">{step.n}</span>
+            <b>{step.t}</b>
+            <p>{step.d}</p>
           </div>
-        </section>
-        <section className="panel private-card">
-          <PanelHeading
-            label={
-              role === "buyer" ? "YOUR PRIVATE INTENT" : "YOUR SELLER PROFILE"
-            }
-            title={role === "buyer" ? "내 구매 조건" : "내 판매 조건"}
-            action={
-              <button
-                className="icon-button"
-                onClick={() => setPage("conditions")}
-                aria-label="조건 수정"
-              >
-                <Icon name="conditions" size={16} />
-              </button>
-            }
-          />
+        ))}
+      </section>
+
+      <div className="overview-grid">
+        <Card
+          title="제안 목록"
+          sub="눌러서 합의서에 올릴 제안을 고르세요"
+          action={
+            <button className="link-btn" onClick={() => setPage("negotiation")}>
+              자세히 <Icon name="arrow" size={13} />
+            </button>
+          }
+        >
+          <OfferList evaluations={evaluations} selectedId={selectedId} choose={chooseOffer} sellerMode={role === "seller"} />
+        </Card>
+        <Card
+          title={role === "buyer" ? "내 구매 조건" : "내 판매 조건"}
+          sub="나에게만 보여요"
+          className="private-card"
+          action={
+            <button className="icon-btn" onClick={() => setPage("conditions")} aria-label="조건 수정">
+              <Icon name="conditions" size={16} />
+            </button>
+          }
+        >
           {role === "buyer" ? (
             <>
-              <span className="private-tag">
-                <Icon name="lock" size={12} /> 나에게만 표시
-              </span>
-              <strong className="private-amount">
-                {money(intent?.maxTotalKrw ?? 0)}
-              </strong>
-              <small>최고 총예산 · 본인 비공개</small>
-              <div className="summary-line">
-                <span>GPU</span>
-                <b>{intent?.gpuModel}</b>
+              <div className="private-amount">
+                <span>
+                  <Icon name="lock" size={13} /> 최고 총예산
+                </span>
+                <b>{money(intent.maxTotalKrw)}</b>
               </div>
-              <div className="summary-line">
-                <span>배송 기한</span>
-                <b>{date(intent?.deliveryDeadline ?? "2026-10-14")}까지</b>
-              </div>
+              <dl className="kv">
+                <div>
+                  <dt>GPU</dt>
+                  <dd>{intent.gpuModel}</dd>
+                </div>
+                <div>
+                  <dt>배송 기한</dt>
+                  <dd>{date(intent.deliveryDeadline)}까지</dd>
+                </div>
+                <div>
+                  <dt>필수 조건</dt>
+                  <dd className="chips">
+                    {intent.mustHave.map((item) => (
+                      <span className="chip" key={item}>
+                        {item}
+                      </span>
+                    ))}
+                  </dd>
+                </div>
+              </dl>
             </>
           ) : (
             <>
-              <span className="private-tag">
-                <Icon name="lock" size={12} /> 나에게만 표시
-              </span>
-              <strong className="private-amount">셀러 02</strong>
-              <small>본인 계정 · 정책 별도 관리</small>
-              <div className="summary-line">
-                <span>내 매물</span>
+              <div className="private-amount seller">
+                <span>
+                  <Icon name="lock" size={13} /> 내 매물
+                </span>
                 <b>RTX 4090 Gaming OC</b>
               </div>
-              <div className="summary-line">
-                <span>상태</span>
-                <b>판매 가능 · demo</b>
-              </div>
+              <dl className="kv">
+                <div>
+                  <dt>판매자</dt>
+                  <dd>셀러 02 · demo</dd>
+                </div>
+                <div>
+                  <dt>최저가</dt>
+                  <dd>조건 화면에서 나만 볼 수 있어요</dd>
+                </div>
+              </dl>
             </>
           )}
-          <p className="privacy-note">
-            <Icon name="shield" size={14} /> 상대방의 비공개 한계는 표시하지
-            않습니다.
+          <p className="note">
+            <Icon name="shield" size={13} /> 상대방의 비공개 한도는 표시하지 않아요.
           </p>
-        </section>
+        </Card>
       </div>
-      <section className="panel">
-        <PanelHeading
-          label="LATEST OFFERS"
-          title="최근 제안"
-          action={
-            <button
-              className="text-button"
-              onClick={() => setPage("negotiation")}
-            >
-              전체 제안 <Icon name="arrow" size={13} />
-            </button>
-          }
-        />
-        <OfferRows evaluations={evaluations} setPage={setPage} compact />
-      </section>
-      <DemoNote />
     </div>
   );
 }
+
+function OfferList({
+  evaluations,
+  selectedId,
+  choose,
+  sellerMode = false,
+}: {
+  evaluations: Evaluation[];
+  selectedId: string;
+  choose: (id: string) => void;
+  sellerMode?: boolean;
+}) {
+  return (
+    <ul className="offer-list">
+      {evaluations.map((item) => {
+        const owner = DEMO_LISTINGS.find((entry) => entry.id === item.offer.listingId);
+        const active = item.offer.id === selectedId;
+        return (
+          <li key={item.offer.id}>
+            <button className={"offer-item" + (active ? " is-active" : "")} onClick={() => choose(item.offer.id)} aria-pressed={active}>
+              <span className="offer-avatar">{owner?.sellerName.slice(-2)}</span>
+              <span className="offer-main">
+                <b>{owner?.sellerName}</b>
+                <small>
+                  {owner?.model} · {item.offer.round}라운드 · {date(item.offer.deliveryBy)} 도착
+                </small>
+              </span>
+              <span className="offer-price">
+                <b>{money(item.offer.totalKrw)}</b>
+                <Verdict status={item.status} sellerMode={sellerMode} reason={item.reasonCode} />
+              </span>
+              <span className={"offer-radio" + (active ? " on" : "")} aria-hidden="true" />
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/* ───────────── conditions ───────────── */
 
 function Conditions({
   role,
@@ -686,6 +799,7 @@ function Conditions({
   sellerPrice,
   setSellerPrice,
   saveSeller,
+  evaluations,
 }: {
   role: UserRole;
   intent: BuyerIntent;
@@ -703,222 +817,218 @@ function Conditions({
   sellerPrice: string;
   setSellerPrice: (value: string) => void;
   saveSeller: (event: FormEvent<HTMLFormElement>) => void;
+  evaluations: Evaluation[];
 }) {
+  const dirty =
+    model.trim() !== intent.gpuModel ||
+    Number(budget) !== intent.maxTotalKrw ||
+    deadline !== intent.deliveryDeadline ||
+    mustHave
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .join("|") !== intent.mustHave.join("|");
   return (
-    <div className="page-stack">
-      <section className="section-heading">
-        <span>{role === "buyer" ? "A" : "A"}</span>
-        <div>
-          <h2>{role === "buyer" ? "구매 조건" : "내 판매 매물"}</h2>
-          <p>
-            {role === "buyer"
-              ? "최고 총예산은 구매자 본인에게만 표시됩니다."
-              : "현재 데모 계정의 정보만 수정할 수 있습니다."}
-          </p>
-        </div>
-      </section>
-      {role === "buyer" ? (
-        <div className="condition-layout">
-          <form className="panel form-panel" onSubmit={saveIntent}>
-            <PanelHeading label="BUYER INTENT" title="거래 의도" />
-            <label>
-              GPU 모델
-              <input
-                value={model}
-                onChange={(e) => setModel(e.currentTarget.value)}
-              />
-            </label>
-            <label>
-              최고 총예산 · 비공개
-              <div className="prefix-input">
-                <span>₩</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="10000"
-                  value={budget}
-                  onChange={(e) => setBudget(e.currentTarget.value)}
-                />
-              </div>
-              <small>배송비를 포함한 한도 · 상대에게 비공개</small>
-            </label>
-            <label>
-              배송 기한
-              <input
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.currentTarget.value)}
-              />
-            </label>
-            <label>
-              필수 조건 · 쉼표로 구분
-              <textarea
-                rows={3}
-                value={mustHave}
-                onChange={(e) => setMustHave(e.currentTarget.value)}
-              />
-            </label>
-            <div className="privacy-box">
-              <Icon name="lock" size={15} /> 조건을 바꾸면 이전 승인은
-              초기화됩니다.
-            </div>
-            <button className="button button-primary">
-              조건 저장 <Icon name="arrow" size={14} />
-            </button>
-          </form>
-          <section className="panel requirements">
-            <PanelHeading label="MUST-HAVE" title="필수 조건 체크리스트" />
-            {intent.mustHave.map((item, i) => (
-              <div className="requirement" key={item}>
-                <span>0{i + 1}</span>
-                <b>{item}</b>
-                <Icon name="check" size={14} />
-              </div>
-            ))}
-            <div className="server-note">
-              <Icon name="shield" size={16} />
-              <span>
-                <b>서버 조건 검사</b>
-                <small>
-                  브라우저 예산 검사는 입력 편의용입니다. 최종 승인 가능 여부는
-                  서버가 결정합니다.
-                </small>
-              </span>
-            </div>
-          </section>
-        </div>
-      ) : (
-        <div className="condition-layout">
-          <form className="panel form-panel" onSubmit={saveSeller}>
-            <PanelHeading
-              label="SELLER LISTING"
-              title="셀러 02 · RTX 4090 Gaming OC"
-            />
-            <label>
-              상품 희망가
-              <div className="prefix-input">
-                <span>₩</span>
-                <input
-                  type="number"
-                  value={sellerPrice}
-                  onChange={(e) => setSellerPrice(e.currentTarget.value)}
-                />
-              </div>
-            </label>
-            <label>
-              배송비
-              <div className="prefix-input">
-                <span>₩</span>
-                <input type="number" defaultValue="30000" />
-              </div>
-            </label>
-            <label>
-              보증 만료일
-              <input type="date" defaultValue="2027-09-02" />
-            </label>
-            <label>
-              상태 설명
-              <textarea
-                rows={3}
-                defaultValue="사용 11개월 · 박스 및 구성품 포함 (판매자 주장)"
-              />
-            </label>
-            <div className="private-price">
+    <div className="stack">
+      <div className="split">
+        {role === "buyer" ? (
+          <form className="card form" onSubmit={saveIntent}>
+            <header className="card-head">
               <div>
-                <b>
-                  <Icon name="lock" size={14} /> 나의 비공개 최저가
-                </b>
-                <span>본인만 표시</span>
+                <h2>구매 조건</h2>
+                <p>바꾸면 이전 승인은 초기화되고 모든 제안을 다시 검사해요.</p>
               </div>
-              <div className="prefix-input">
-                <span>₩</span>
-                <input
-                  type="number"
-                  value={sellerMinimum}
-                  onChange={(e) => setSellerMinimum(e.currentTarget.value)}
-                />
-              </div>
-              <small>
-                구매자 화면이나 공개 제안 카드에는 포함하지 않습니다. 로컬
-                데모에만 저장됩니다.
-              </small>
-            </div>
-            <button className="button button-primary">
-              매물 초안 저장 <Icon name="arrow" size={14} />
-            </button>
-          </form>
-          <section className="panel requirements">
-            <PanelHeading label="EVIDENCE ATTACHED" title="매물 증빙" />
-            {DEMO_EVIDENCE.filter((item) =>
-              DEMO_LISTINGS[1].evidenceIds.includes(item.id),
-            ).map((item) => (
-              <div className="evidence-line" key={item.id}>
-                <Icon name="file" size={15} />
-                <span>{item.label}</span>
-                <EvidenceBadge state={item.status} />
-              </div>
-            ))}
-            <div className="server-note">
-              <Icon name="lock" size={16} />
-              <span>
-                <b>비공개 정책 분리</b>
-                <small>
-                  이 입력은 현재 서버로 전송하지 않습니다. 다른 판매자의
-                  최저가는 표시하지 않습니다.
-                </small>
+              <span className={"pill small " + (dirty ? "tone-info" : "tone-idle")}>
+                <i />
+                {dirty ? "저장 안 됨" : "저장됨"}
               </span>
+            </header>
+            <label className="field">
+              <span>GPU 모델</span>
+              <input id="intent-model" value={model} onChange={(e) => setModel(e.currentTarget.value)} />
+            </label>
+            <label className="field private">
+              <span>
+                최고 총예산{" "}
+                <em>
+                  <Icon name="lock" size={11} /> 나만 보기
+                </em>
+              </span>
+              <span className="money-input">
+                <span>₩</span>
+                <input id="intent-budget" type="number" min="0" step="10000" value={budget} onChange={(e) => setBudget(e.currentTarget.value)} />
+              </span>
+              <small>배송비 포함 · 판매자 에이전트와 판매자 화면에는 전달하지 않아요</small>
+            </label>
+            <div className="field-row">
+              <label className="field">
+                <span>배송 기한</span>
+                <input id="intent-deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.currentTarget.value)} />
+              </label>
+              <label className="field">
+                <span>필수 조건 (쉼표로 구분)</span>
+                <input id="intent-must" value={mustHave} onChange={(e) => setMustHave(e.currentTarget.value)} />
+              </label>
             </div>
-          </section>
-        </div>
-      )}
-      <section className="section-heading">
-        <span>B</span>
-        <div>
-          <h2>공개 매물</h2>
-          <p>상품가·배송비·상태·보증과 증빙 확인 상태를 비교합니다.</p>
-        </div>
-        <small>3 LISTINGS · DEMO</small>
-      </section>
-      <div className="listing-grid">
-        {DEMO_LISTINGS.map((item, index) => (
-          <article className="listing-card" key={item.id}>
-            <div className={"listing-visual " + item.accent}>
-              <span className="listing-count">0{index + 1}</span>
-              <div className="gpu-mini">
-                <i />
-                <i />
-                <b>RTX 4090</b>
+            <div className="form-foot">
+              <button className="btn btn-primary">
+                조건 저장 <Icon name="arrow" size={14} />
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form className="card form" onSubmit={saveSeller}>
+            <header className="card-head">
+              <div>
+                <h2>셀러 02 · RTX 4090 Gaming OC</h2>
+                <p>이 브라우저 데모에만 임시 저장돼요.</p>
               </div>
-              <span className="stock-tag">{item.stockStatus}</span>
+            </header>
+            <div className="field-row">
+              <label className="field">
+                <span>희망 판매가</span>
+                <span className="money-input">
+                  <span>₩</span>
+                  <input id="seller-price" type="number" value={sellerPrice} onChange={(e) => setSellerPrice(e.currentTarget.value)} />
+                </span>
+              </label>
+              <label className="field">
+                <span>배송비</span>
+                <span className="money-input">
+                  <span>₩</span>
+                  <input id="seller-ship" type="number" defaultValue="30000" />
+                </span>
+              </label>
             </div>
-            <h3>{item.model}</h3>
-            <p className="listing-owner">{item.sellerName} · demo</p>
-            <p className="listing-condition">{item.condition}</p>
-            <div className="listing-price">
-              <span>상품가 + 배송비</span>
-              <b>{money(item.askingPriceKrw + item.shippingFeeKrw)}</b>
+            <div className="field-row">
+              <label className="field">
+                <span>보증 만료일</span>
+                <input id="seller-warranty" type="date" defaultValue="2027-09-02" />
+              </label>
+              <label className="field">
+                <span>상태 설명</span>
+                <input id="seller-condition" defaultValue="사용 11개월 · 박스 및 구성품 포함 (판매자 주장)" />
+              </label>
             </div>
-            <div className="listing-bottom">
-              <span>배송 {date(item.deliveryBy)}</span>
-              <span>보증 {date(item.warrantyEnd)}</span>
+            <label className="field private seller">
+              <span>
+                나의 최저가{" "}
+                <em>
+                  <Icon name="lock" size={11} /> 나만 보기
+                </em>
+              </span>
+              <span className="money-input">
+                <span>₩</span>
+                <input id="seller-min" type="number" value={sellerMinimum} onChange={(e) => setSellerMinimum(e.currentTarget.value)} />
+              </span>
+              <small>구매자 화면과 공개 제안에는 포함하지 않아요. 서버로 보내지도 않아요.</small>
+            </label>
+            <div className="form-foot">
+              <button className="btn btn-primary">
+                매물 초안 저장 <Icon name="arrow" size={14} />
+              </button>
             </div>
-            <div className="evidence-chips">
-              {DEMO_EVIDENCE.filter((e) => item.evidenceIds.includes(e.id)).map(
-                (e) => (
-                  <EvidenceBadge key={e.id} state={e.status} />
-                ),
-              )}
-            </div>
-          </article>
-        ))}
+          </form>
+        )}
+        <div className="stack">
+          {role === "buyer" ? (
+            <Card title="필수 조건" sub="제안마다 이 항목의 증빙을 확인해요">
+              <ul className="check-list">
+                {intent.mustHave.map((item) => (
+                  <li key={item}>
+                    <span className="check-icon">
+                      <Icon name="check" size={12} />
+                    </span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : (
+            <Card title="첨부한 증빙" sub="구매자 에이전트가 확인하는 자료예요">
+              <ul className="ev-list">
+                {DEMO_EVIDENCE.filter((item) => DEMO_LISTINGS[1].evidenceIds.includes(item.id)).map((item) => (
+                  <li key={item.id}>
+                    <span>
+                      <b>{item.label}</b>
+                      <small>{item.source}</small>
+                    </span>
+                    <EvidenceTag state={item.status} />
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          <div className="callout">
+            <Icon name="shield" size={18} />
+            <p>
+              <b>최종 판정은 서버가 해요</b>
+              화면의 예산 확인은 입력을 돕기 위한 것이고, 승인 가능 여부는 서버가 다시 검사해요.
+            </p>
+          </div>
+        </div>
       </div>
-      <DemoNote />
+
+      <div className="section-title">
+        <h2>공개 매물</h2>
+        <p>모든 매물은 데모용 가상 데이터예요.</p>
+      </div>
+      <div className="listing-grid">
+        {DEMO_LISTINGS.map((item) => {
+          const evaluation = evaluations.find((entry) => entry.offer.listingId === item.id);
+          const hidden = role === "seller" && item.id !== "listing-02";
+          return (
+            <article className="listing" key={item.id}>
+              <div className="listing-art">
+                <GpuArt id={item.id} label={item.model} fans={item.id === "listing-01" ? 2 : 3} />
+                {!hidden && evaluation && (
+                  <span className="listing-verdict">
+                    <Verdict status={evaluation.status} reason={evaluation.reasonCode} />
+                  </span>
+                )}
+              </div>
+              <div className="listing-body">
+                <p className="listing-seller">
+                  {item.sellerName} · {item.stockStatus}
+                </p>
+                <h3>{item.model}</h3>
+                <p className="listing-cond">{item.condition}</p>
+                <div className="listing-price">
+                  <span>상품가 + 배송비</span>
+                  <b>{money(item.askingPriceKrw + item.shippingFeeKrw)}</b>
+                </div>
+                <dl className="listing-meta">
+                  <div>
+                    <dt>도착</dt>
+                    <dd>{date(item.deliveryBy)}</dd>
+                  </div>
+                  <div>
+                    <dt>보증</dt>
+                    <dd>{date(item.warrantyEnd)}</dd>
+                  </div>
+                </dl>
+                <ul className="listing-ev">
+                  {DEMO_EVIDENCE.filter((e) => item.evidenceIds.includes(e.id)).map((e) => (
+                    <li key={e.id}>
+                      <span>{e.label}</span>
+                      <EvidenceTag state={e.status} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
+/* ───────────── negotiation ───────────── */
+
 function Negotiation({
   role,
+  intent,
   evaluations,
   selectedId,
   setSelectedId,
@@ -926,149 +1036,157 @@ function Negotiation({
   scenario,
 }: {
   role: UserRole;
-  evaluations: ReturnType<typeof validateOffers>;
+  intent: BuyerIntent;
+  evaluations: Evaluation[];
   selectedId: string;
   setSelectedId: (id: string) => void;
   setPage: (page: PageKey) => void;
   scenario: (kind: "A" | "B" | "C") => void;
 }) {
-  const selected =
-    evaluations.find((item) => item.offer.id === selectedId) ?? evaluations[0];
-  const listing = DEMO_LISTINGS.find(
-    (item) => item.id === selected?.offer.listingId,
-  );
-  const evidence = DEMO_EVIDENCE.filter((item) =>
-    selected?.offer.evidenceIds.includes(item.id),
-  );
+  const selected = evaluations.find((item) => item.offer.id === selectedId) ?? evaluations[0];
+  const listing = DEMO_LISTINGS.find((item) => item.id === selected?.offer.listingId);
+  const evidence = DEMO_EVIDENCE.filter((item) => selected?.offer.evidenceIds.includes(item.id));
+  const sellerMode = role === "seller";
+  const checks = selected ? inspectOffer(selected.offer, intent) : [];
   const reasonText =
-    role === "seller" && selected?.reasonCode === "BUDGET_EXCEEDED"
-      ? "요청된 조건을 만족하지 않아 서버 검증에서 차단됐습니다."
+    sellerMode && selected?.reasonCode === "BUDGET_EXCEEDED"
+      ? "요청된 조건을 만족하지 않아 서버 검증에서 차단됐어요."
       : selected?.reason;
-  const reasonCode =
-    role === "seller" && selected?.reasonCode === "BUDGET_EXCEEDED"
-      ? "POLICY CHECK"
-      : selected?.reasonCode;
+  const active =
+    intent.maxTotalKrw === DEMO_BUYER_INTENT.maxTotalKrw && intent.deliveryDeadline === DEMO_BUYER_INTENT.deliveryDeadline
+      ? "A"
+      : intent.maxTotalKrw === 1_950_000 && intent.deliveryDeadline === DEMO_BUYER_INTENT.deliveryDeadline
+        ? "B"
+        : intent.deliveryDeadline === "2026-10-02" && intent.maxTotalKrw === DEMO_BUYER_INTENT.maxTotalKrw
+          ? "C"
+          : "";
+  const rows: RulerRow[] = evaluations.map((item) => {
+    const owner = DEMO_LISTINGS.find((entry) => entry.id === item.offer.listingId)!;
+    return {
+      id: item.offer.id,
+      code: owner.sellerName,
+      title: owner.model.replace("RTX 4090 ", ""),
+      ask: owner.askingPriceKrw + owner.shippingFeeKrw,
+      offer: item.offer.totalKrw,
+      status: item.status === "valid" ? "pass" : "block",
+      reason: sellerMode ? "정책 검사" : reasonKo[item.reasonCode ?? ""],
+    };
+  });
+  const ask = listing ? listing.askingPriceKrw + listing.shippingFeeKrw : 0;
+  const fromBuyer = selected?.offer.proposer === "buyer_agent";
   return (
-    <div className="page-stack">
-      <section className="scenario-bar">
+    <div className="stack">
+      <div className="scenario">
         <div>
-          <span>
-            <Icon name="spark" size={13} /> DEMO SCENARIOS
-          </span>
-          <b>조건 변경 결과 재현</b>
-          <small>demo/mock 검사 · Kiln 호출 없음</small>
+          <b>조건을 바꿔서 결과를 확인해보세요</b>
+          <span>mock 검사 · Kiln 호출 없음</span>
         </div>
-        <div className="scenario-buttons">
-          <button onClick={() => scenario("A")}>
-            <i>A</i> 기본
-          </button>
-          <button onClick={() => scenario("B")}>
-            <i>B</i> 예산 변경
-          </button>
-          <button onClick={() => scenario("C")}>
-            <i>C</i> 기한 변경
-          </button>
-        </div>
-      </section>
-      <div className="neg-meta">
-        <span>
-          <small>NEGOTIATION ID</small>
-          <b>NEG-DEMO-049</b>
-        </span>
-        <span>
-          <small>ROUND LIMIT</small>
-          <b>초기 제안 + 최대 2회 반대 제안</b>
-        </span>
-        <span>
-          <small>현재 조건 결과</small>
-          <b className="valid-count">
-            {evaluations.filter((item) => item.status === "valid").length} 유효{" "}
-            <i>·</i>{" "}
-            {evaluations.filter((item) => item.status === "blocked").length}{" "}
-            차단
-          </b>
-        </span>
-      </div>
-      <section className="panel">
-        <PanelHeading
-          label="SELLER OFFERS"
-          title="판매자별 제안"
-          action={<span className="mock-label">정책 검사 · demo/mock</span>}
-        />
-        <OfferRows
-          evaluations={evaluations}
-          selectedId={selectedId}
-          choose={setSelectedId}
-          sellerMode={role === "seller"}
-        />
-      </section>
-      {selected && (
-        <section className="panel rationale-panel">
-          <div className="rationale-heading">
-            <div>
-              <small>SELECTED OFFER</small>
-              <h2>제안 근거와 증빙 출처</h2>
-            </div>
-            <span className="ai-label">
-              <Icon name="spark" size={13} /> DEMO 설명 · Kiln 미연결
-            </span>
-          </div>
-          <div className="rationale-body">
-            <div className="rationale-text">
-              <Icon name="spark" size={17} />
-              <div>
-                <small>제안 설명 · demo/mock</small>
-                <p>{selected.offer.explanation}</p>
-                <span>실제 AI 모델 호출 없음 · 예시 문구</span>
-              </div>
-            </div>
-            <div className="rationale-item">
-              <small>매물 설명</small>
-              <b>{listing?.condition}</b>
-              <span>
-                {listing?.model} · {listing?.sellerName}
-              </span>
-            </div>
-            <div className="rationale-evidence">
-              <small>참조 증빙</small>
-              {evidence.map((item) => (
-                <div key={item.id}>
-                  <Icon name="file" size={14} />
-                  <span>{item.label}</span>
-                  <EvidenceBadge state={item.status} />
-                </div>
-              ))}
-            </div>
-          </div>
-          {selected.status === "blocked" && (
-            <div className="blocked-reason">
-              <Icon name="alert" size={16} />
-              <span>
-                <b>서버 차단 이유 · {reasonCode}</b>
-                <small>{reasonText}</small>
-              </span>
-            </div>
-          )}
-          <div className="rationale-footer">
-            <span>
-              <Icon name="clock" size={14} /> 제안 만료{" "}
-              {date(selected.offer.expiresAt.slice(0, 10))} · 총액/기한 재검증
-              필요
-            </span>
-            <button
-              className="button button-primary"
-              onClick={() => setPage("agreement")}
-              disabled={selected.status !== "valid"}
-            >
-              합의 스냅샷 열기 <Icon name="arrow" size={14} />
+        <div className="segmented" role="group" aria-label="데모 시나리오">
+          {[
+            { key: "A" as const, label: "기본" },
+            { key: "B" as const, label: "예산 ₩195만" },
+            { key: "C" as const, label: "기한 10월 2일" },
+          ].map((item) => (
+            <button key={item.key} className={active === item.key ? "is-on" : ""} onClick={() => scenario(item.key)} disabled={sellerMode} aria-pressed={active === item.key}>
+              {item.label}
             </button>
-          </div>
-        </section>
+          ))}
+        </div>
+      </div>
+
+      <div className="split wide">
+        <Card title="호가에서 제안까지" sub={sellerMode ? "판매자 화면에는 내 매물만 보여요" : "파란 선은 나만 보는 예산 한도예요"}>
+          <PriceRuler rows={rows} budget={sellerMode ? null : intent.maxTotalKrw} selectedId={selectedId} onSelect={setSelectedId} />
+        </Card>
+        {selected && listing && (
+          <Card title="협상 대화" sub={`${listing.sellerName} · ${listing.model}`} className="thread-card">
+            <ol className="thread">
+              <li className="msg seller">
+                <span className="msg-who">판매자 · 매물 등록</span>
+                <p>
+                  <b>{money(ask)}</b>에 올렸어요. (배송비 포함)
+                </p>
+              </li>
+              <li className={"msg " + (fromBuyer ? "buyer" : "seller")}>
+                <span className="msg-who">
+                  {fromBuyer ? "구매자 에이전트" : "판매자 에이전트"} · {selected.offer.round}라운드
+                </span>
+                <p>
+                  <b>{money(selected.offer.totalKrw)}</b> 제안해요.
+                </p>
+                <p className="msg-sub">{selected.offer.explanation}</p>
+              </li>
+              <li className={"msg system " + (selected.status === "valid" ? "pass" : "block")}>
+                <Icon name={selected.status === "valid" ? "shield" : "alert"} size={14} />
+                {selected.status === "valid"
+                  ? "서버 검사 · 규칙 4개 모두 통과"
+                  : `서버 차단 · ${sellerMode ? "정책 검사" : reasonKo[selected.reasonCode ?? ""]}`}
+              </li>
+            </ol>
+            <p className="note">에이전트 문구는 예시예요 (Kiln 미연결). 서명 대상이 아니에요.</p>
+          </Card>
+        )}
+      </div>
+
+      {selected && (
+        <div className="split">
+          <Card
+            title="서버 검사 결과"
+            sub="같은 입력이면 언제나 같은 결과가 나와요"
+            action={<Verdict status={selected.status} sellerMode={sellerMode} reason={selected.reasonCode} />}
+          >
+            <ul className="rules">
+              {checks.map((check) => (
+                <li key={check.rule} className={check.passed ? "pass" : "block"}>
+                  <span className="rule-icon">
+                    <Icon name={check.passed ? "check" : "alert"} size={12} />
+                  </span>
+                  <span className="rule-name">{check.label}</span>
+                  <span className="rule-values">
+                    <span>기준 {check.privateExpected && sellerMode ? "비공개" : check.expected}</span>
+                    <span>실제 {check.actual}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {selected.status === "blocked" && (
+              <div className="callout danger">
+                <Icon name="alert" size={18} />
+                <p>
+                  <b>이 제안은 합의서로 넘어갈 수 없어요</b>
+                  {reasonText}
+                </p>
+              </div>
+            )}
+          </Card>
+          <Card title="증빙 상태" sub="판매자가 올린 자료와 확인 여부">
+            <ul className="ev-list">
+              {evidence.map((item) => (
+                <li key={item.id}>
+                  <span>
+                    <b>{item.label}</b>
+                    <small>{item.source}</small>
+                  </span>
+                  <EvidenceTag state={item.status} />
+                </li>
+              ))}
+            </ul>
+            <div className="card-foot">
+              <span>
+                <Icon name="clock" size={13} /> {date(selected.offer.expiresAt.slice(0, 10))}에 만료
+              </span>
+              <button className="btn btn-primary" onClick={() => setPage("agreement")} disabled={selected.status !== "valid"}>
+                {selected.status === "valid" ? "합의서로 가기" : "차단된 제안"} <Icon name="arrow" size={14} />
+              </button>
+            </div>
+          </Card>
+        </div>
       )}
-      <DemoNote />
     </div>
   );
 }
+
+/* ───────────── agreement ───────────── */
 
 function Agreement({
   role,
@@ -1095,9 +1213,9 @@ function Agreement({
   setPage,
 }: {
   role: UserRole;
-  listing: import("./types").Listing | undefined;
-  snapshot: import("./types").AgreementSnapshot | null;
-  evaluation: ReturnType<typeof validateOffers>[number] | undefined;
+  listing: Listing | undefined;
+  snapshot: AgreementSnapshot | null;
+  evaluation: Evaluation | undefined;
   status: string;
   expired: boolean;
   matches: boolean;
@@ -1118,648 +1236,242 @@ function Agreement({
   setPage: (page: PageKey) => void;
 }) {
   const valid = evaluation?.status === "valid";
-  const heading =
-    status === "RECORDING"
-      ? "체인 기록 대기"
-      : status === "AWAITING_APPROVALS"
-        ? "다른 당사자 승인 대기"
-        : status === "BLOCKED"
-          ? "조건 검사 차단"
-          : status === "EXPIRED"
-            ? "제안 만료"
-            : status === "REJECTED"
-              ? "합의 거절"
-              : "양측 승인 전";
   const detail =
     status === "RECORDING"
-      ? "데모 승인 입력을 받았습니다. 실제 체인 영수증이 없어 RECORDED 상태는 아닙니다."
+      ? "양쪽 데모 서명을 받았어요. 실제 체인 영수증이 없어서 '기록 완료'로 표시하지 않아요."
       : status === "AWAITING_APPROVALS"
-        ? "한쪽만 승인했습니다. 다른 당사자의 명시적 승인과 실제 체인 기록 확인이 필요합니다."
+        ? "한쪽만 서명했어요. 상대방의 서명과 체인 기록 확인이 더 필요해요."
         : status === "BLOCKED"
-          ? "현재 조건 검사에서 차단됐습니다. 유효 제안을 선택하거나 조건을 조정하세요."
+          ? "이 제안은 서버 검사에서 막혔어요. 통과한 제안을 고르거나 조건을 바꿔주세요."
           : status === "EXPIRED"
-            ? "제안 만료 시각이 지나 승인을 진행할 수 없습니다."
+            ? "제안 만료 시각이 지나 서명할 수 없어요."
             : status === "REJECTED"
-              ? "한쪽이 거절하여 데모 승인 입력을 초기화했습니다."
-              : "서명 전에 같은 합의 스냅샷과 지갑 주소를 확인하세요.";
+              ? "한쪽이 거절해서 서명을 초기화했어요."
+              : "서명하기 전에 합의서 내용과 지갑 주소를 확인해주세요.";
+  const steps = [
+    { title: "지갑 연결", detail: connected ? "주소 확인됨" : "데모 지갑 주소 확인", done: connected, active: !connected },
+    { title: "합의서 확인", detail: "금액 · 배송 · 해시", done: checked, active: connected && !checked },
+    { title: "서명", detail: signed ? "데모 서명 완료" : "직접 눌러서 서명", done: signed, active: checked && !signed },
+  ];
+  const tone = ["BLOCKED", "REJECTED", "EXPIRED"].includes(status) ? "block" : bothSigned ? "done" : "open";
   return (
-    <div className="page-stack">
-      <section className={"agreement-banner " + status.toLowerCase()}>
-        <span className="banner-icon">
-          <Icon
-            name={
-              status === "RECORDING"
-                ? "clock"
-                : status === "BLOCKED" ||
-                    status === "REJECTED" ||
-                    status === "EXPIRED"
-                  ? "alert"
-                  : "agreement"
-            }
-            size={20}
-          />
-        </span>
-        <div>
-          <small>AGREEMENT STATUS</small>
-          <h2>{heading}</h2>
+    <div className="stack">
+      <section className={"sign-hero tone-" + tone}>
+        <div className={"party buyer" + (buyerSigned ? " on" : "")}>
+          <span className="party-avatar">구</span>
+          <span>
+            <b>구매자</b>
+            <small>{buyerSigned ? "서명 완료" : "서명 대기"}</small>
+          </span>
+        </div>
+        <div className="sign-bridge" aria-hidden="true">
+          <span className={"bridge-line buyer" + (buyerSigned ? " on" : "")} />
+          <span className="bridge-doc">
+            <Icon name={tone === "block" ? "alert" : tone === "done" ? "check" : "agreement"} size={18} />
+          </span>
+          <span className={"bridge-line seller" + (sellerSigned ? " on" : "")} />
+        </div>
+        <div className={"party seller" + (sellerSigned ? " on" : "")}>
+          <span className="party-avatar">판</span>
+          <span>
+            <b>판매자</b>
+            <small>{sellerSigned ? "서명 완료" : "서명 대기"}</small>
+          </span>
+        </div>
+        <div className="sign-status">
+          <StatusPill status={status} />
           <p>{detail}</p>
         </div>
-        <StatusBadge status={status} />
       </section>
+
       {!snapshot ? (
-        <section className="panel empty-agreement">
-          <Icon name="agreement" size={25} />
-          <p>합의안을 만들 수 없습니다.</p>
-          <button
-            className="text-button"
-            onClick={() => setPage("negotiation")}
-          >
-            유효 제안 선택 <Icon name="arrow" size={13} />
+        <section className="card empty">
+          <p>합의서를 만들 수 없어요.</p>
+          <button className="btn btn-secondary" onClick={() => setPage("negotiation")}>
+            제안 고르러 가기
           </button>
         </section>
       ) : (
-        <div className="agreement-grid">
-          <section className="panel snapshot-panel">
-            <div className="snapshot-head">
+        <div className="split">
+          <section className="card doc">
+            <header className="doc-head">
               <div>
-                <small>IMMUTABLE SNAPSHOT · DEMO</small>
-                <h2>합의 내용</h2>
+                <p className="eyebrow">합의서 · {snapshot.agreementId}</p>
+                <h2>{snapshot.model}</h2>
+                <p>
+                  {listing?.sellerName} · {snapshot.listingId} · demo
+                </p>
               </div>
-              <code>{snapshot.agreementId}</code>
+              <HashDie hash={snapshot.snapshotHash} size={72} />
+            </header>
+            <div className="doc-total">
+              <span>총 합의 금액</span>
+              <strong>{money(snapshot.totalKrw)}</strong>
+              <small>
+                상품 {money(snapshot.itemPriceKrw)} + 배송 {money(snapshot.shippingFeeKrw)}
+              </small>
             </div>
-            <div className="snapshot-product">
-              <div className={"product-cube " + (listing?.accent ?? "blue")}>
-                <i />
-                <i />
-                <b>4090</b>
+            <dl className="kv">
+              <div>
+                <dt>도착 예정</dt>
+                <dd>{date(snapshot.deliveryBy)}까지</dd>
               </div>
               <div>
-                <b>{snapshot.model}</b>
-                <span>
-                  {listing?.sellerName} · {snapshot.listingId}
-                </span>
-              </div>
-              <span className="demo-chip">DEMO</span>
-            </div>
-            <div className="price-lines">
-              <div>
-                <span>상품가</span>
-                <b>{money(snapshot.itemPriceKrw)}</b>
+                <dt>보증</dt>
+                <dd>{snapshot.warrantyTerms}</dd>
               </div>
               <div>
-                <span>배송비</span>
-                <b>{money(snapshot.shippingFeeKrw)}</b>
-              </div>
-              <div className="total-line">
-                <span>총 합의 금액</span>
-                <strong>{money(snapshot.totalKrw)}</strong>
-              </div>
-            </div>
-            <div className="snapshot-details">
-              <div>
-                <span>배송 예정</span>
-                <b>{date(snapshot.deliveryBy)}까지</b>
+                <dt>상태</dt>
+                <dd>{snapshot.condition}</dd>
               </div>
               <div>
-                <span>보증 조건</span>
-                <b>{snapshot.warrantyTerms}</b>
+                <dt>제안 만료</dt>
+                <dd>{date(snapshot.expiresAt.slice(0, 10))}</dd>
               </div>
               <div>
-                <span>매물 상태</span>
-                <b>{snapshot.condition}</b>
+                <dt>구매자 지갑</dt>
+                <dd className="mono">{snapshot.buyerWallet}</dd>
               </div>
               <div>
-                <span>제안 만료</span>
-                <b>{date(snapshot.expiresAt.slice(0, 10))}</b>
+                <dt>판매자 지갑</dt>
+                <dd className="mono">{snapshot.sellerWallet}</dd>
               </div>
-            </div>
-            <div className="hash-row">
+            </dl>
+            <div className="hash-box">
               <span>
-                <Icon name="shield" size={14} /> 스냅샷 해시
+                스냅샷 해시 <em>SHA-256 · mock</em>
               </span>
               <code>{snapshot.snapshotHash}</code>
-              <i>MOCK</i>
-            </div>
-            <div className="wallet-pair">
-              <WalletAddress
-                label="구매자 주소"
-                address={snapshot.buyerWallet}
-                signed={buyerSigned}
-              />
-              <span className="wallet-link">
-                <Icon name="network" size={15} />
-              </span>
-              <WalletAddress
-                label="판매자 주소"
-                address={snapshot.sellerWallet}
-                signed={sellerSigned}
-              />
-            </div>
-            <div className="snapshot-evidence">
-              <div>
-                <b>스냅샷 증빙 참조</b>
-                <small>원본 파일은 체인에 올리지 않습니다.</small>
-              </div>
-              <div>
-                {snapshot.evidenceHashes.map((hash) => (
-                  <code key={hash}>{hash}</code>
-                ))}
-              </div>
+              <small>내용이 한 글자라도 바뀌면 해시와 오른쪽 위 지문이 완전히 달라져요.</small>
             </div>
             <div className={"integrity " + (matches ? "good" : "bad")}>
-              <Icon name={matches ? "check" : "alert"} size={15} />
-              <span>
-                {matches
-                  ? "approval-payload와 화면의 금액·배송·보증·증빙이 일치합니다."
-                  : "승인 자료가 화면 내용과 달라 서명을 중단했습니다."}
-              </span>
-              <b>{matches ? "일치" : "불일치"}</b>
+              <Icon name={matches ? "check" : "alert"} size={14} />
+              {matches ? "서명 자료와 화면의 금액·배송·보증·증빙이 일치해요" : "서명 자료가 화면과 달라 서명을 멈췄어요"}
             </div>
           </section>
-          <aside className="approval-side">
-            <section className="panel approval-panel">
-              <div className="approval-head">
-                <small>YOUR APPROVAL</small>
-                <h2>{role === "buyer" ? "구매자 확인" : "판매자 확인"}</h2>
-                <p>선택한 역할 본인의 지갑으로만 승인할 수 있습니다.</p>
-              </div>
-              <SignStep
-                number="1"
-                title="지갑 연결"
-                detail={connected ? "데모 지갑 연결됨" : "주소 및 체인 확인"}
-                active={!connected}
-                done={connected}
-              />
-              <SignStep
-                number="2"
-                title="내용 재확인"
-                detail="같은 합의 스냅샷 확인"
-                active={connected && !checked}
-                done={checked}
-              />
-              <SignStep
-                number="3"
-                title="사용자 승인"
-                detail={
-                  signed ? "demo/mock 승인 입력" : "직접 버튼을 눌러 승인"
-                }
-                active={checked && !signed}
-                done={signed}
-              />
-              <div className="wallet-connect">
+
+          <div className="stack">
+            <section className={"card approve role-" + role}>
+              <header className="card-head">
                 <div>
-                  <Icon name="wallet" size={16} />
-                  <span>
-                    <b>{connected ? "데모 지갑 연결됨" : "지갑 연결"}</b>
-                    <small>로컬 시뮬레이션 · 실제 지갑 아님</small>
-                  </span>
-                  <i className={connected ? "on" : ""} />
+                  <h2>{role === "buyer" ? "구매자로 서명하기" : "판매자로 서명하기"}</h2>
+                  <p>내 역할의 지갑으로만 서명할 수 있어요.</p>
                 </div>
-                {connected && <code>{address}</code>}
-                <small className="chain-id">
-                  CHAIN ID <b>31337</b> · demo placeholder · 미확정
-                </small>
-                <button
-                  className={
-                    connected
-                      ? "button button-secondary full"
-                      : "button button-primary full"
-                  }
-                  onClick={connect}
-                  disabled={!valid || expired || rejected}
-                >
-                  {connected ? "데모 주소 재확인" : "데모 지갑 연결"}{" "}
-                  <Icon name="wallet" size={14} />
+              </header>
+              <ol className="steps">
+                {steps.map((step, index) => (
+                  <li key={step.title} className={(step.done ? "is-done" : "") + (step.active ? " is-active" : "")}>
+                    <span className="step-n">{step.done ? <Icon name="check" size={12} /> : index + 1}</span>
+                    <span>
+                      <b>{step.title}</b>
+                      <small>{step.detail}</small>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <div className={"wallet" + (connected ? " on" : "")}>
+                <span className="wallet-dot" />
+                <span className="wallet-info">
+                  <b>{connected ? "데모 지갑 연결됨" : "지갑 미연결"}</b>
+                  <small className="mono">{connected ? address : "로컬 시뮬레이션 · Chain ID 31337"}</small>
+                </span>
+                <button className="btn btn-secondary small" onClick={connect} disabled={!valid || expired || rejected}>
+                  {connected ? "다시 확인" : "연결"}
                 </button>
               </div>
-              <label
-                className={
-                  "snapshot-check" + (!connected || !matches ? " muted" : "")
-                }
-              >
+              <label className={"confirm" + (!connected || !matches ? " is-muted" : "")}>
                 <input
                   type="checkbox"
+                  id="confirm-snapshot"
                   checked={checked}
-                  disabled={
-                    !connected || !matches || !valid || expired || rejected
-                  }
+                  disabled={!connected || !matches || !valid || expired || rejected}
                   onChange={(e) => setChecked(e.currentTarget.checked)}
                 />
-                <span>합의 내용과 서명할 주소를 확인했습니다.</span>
+                <span className="confirm-box" aria-hidden="true">
+                  <Icon name="check" size={12} />
+                </span>
+                합의서 내용, 지갑 주소, 스냅샷 해시를 확인했어요.
               </label>
-              <button
-                className="button button-approve full"
-                onClick={sign}
-                disabled={!canSign}
-              >
-                {signed ? "데모 승인 제출됨" : "이 내용에 데모 승인 제출"}{" "}
-                <Icon name="check" size={15} />
+              <button className="btn btn-primary full sign-btn" onClick={sign} disabled={!canSign}>
+                {signed ? "서명을 남겼어요" : "이 합의서에 서명"} <Icon name="check" size={15} />
               </button>
-              <button
-                className="reject-button"
-                onClick={reject}
-                disabled={!valid || expired || rejected || bothSigned}
-              >
+              <button className="btn btn-ghost full" onClick={reject} disabled={!valid || expired || rejected || bothSigned}>
                 합의 거절
               </button>
-              {connected && !addressMatches && (
-                <p className="inline-error">
-                  합의 스냅샷의 주소와 연결 주소가 다릅니다.
-                </p>
-              )}
+              {connected && !addressMatches && <p className="error-text">합의서의 주소와 연결한 주소가 달라요.</p>}
             </section>
-            <section className="recording-card">
-              <span>
-                <Icon name="network" size={16} />{" "}
-                {status === "RECORDING" ? "RECORDING" : "CHAIN RECORD"}
-              </span>
-              <b>
-                {status === "RECORDING" ? "영수증 확인 대기" : "체인 연결 대기"}
-              </b>
-              <p>
-                실제 서버 응답과 체인 영수증 검증 전에는 RECORDED를 표시하지
-                않습니다.
-              </p>
-              <div>
-                <small>TX HASH</small>
-                <code>생성되지 않음 · mock</code>
-              </div>
+            <section className="card chain">
+              <header className="card-head">
+                <div>
+                  <h2>체인 기록</h2>
+                  <p>{status === "RECORDING" ? "영수증 확인 대기" : "양측 서명 후 시작돼요"}</p>
+                </div>
+                <span className="pill small tone-idle">
+                  <i /> mock
+                </span>
+              </header>
+              <p className="note">TX 해시 없음 · 실제 서버 응답과 체인 영수증 검증 전에는 기록 완료로 표시하지 않아요.</p>
             </section>
-          </aside>
+          </div>
         </div>
       )}
-      <div className="approval-rule">
-        <Icon name="lock" size={14} /> 한쪽 승인만으로 거래가 완료되지 않습니다.
-        조건 변경·만료·거절·스냅샷 불일치 시 서명이 차단됩니다.
-      </div>
-      <DemoNote />
     </div>
   );
 }
+
+/* ───────────── audit ───────────── */
 
 function Audit({ events }: { events: AuditEvent[] }) {
+  const count = (fn: (event: AuditEvent) => boolean) => events.filter(fn).length;
+  const label: Record<AuditEvent["decision"], string> = { info: "기록", allowed: "통과", blocked: "차단", pending: "대기", rejected: "거절" };
   return (
-    <div className="page-stack">
-      <div className="audit-metrics">
-        <div>
-          <small>기록 이벤트</small>
-          <b>{String(events.length).padStart(2, "0")}</b>
+    <div className="stack">
+      <section className="stats">
+        <div className="stat">
+          <span>전체 이벤트</span>
+          <b>{events.length}</b>
         </div>
-        <div>
-          <small>조건 통과</small>
-          <b className="green-text">
-            {String(
-              events.filter((e) => e.decision === "allowed").length,
-            ).padStart(2, "0")}
-          </b>
+        <div className="stat">
+          <span>통과 판정</span>
+          <b className="c-pass">{count((e) => e.decision === "allowed")}</b>
         </div>
-        <div>
-          <small>차단 · 거절</small>
-          <b className="amber-text">
-            {String(
-              events.filter(
-                (e) => e.decision === "blocked" || e.decision === "rejected",
-              ).length,
-            ).padStart(2, "0")}
-          </b>
+        <div className="stat">
+          <span>차단 · 거절</span>
+          <b className="c-block">{count((e) => e.decision === "blocked" || e.decision === "rejected")}</b>
         </div>
-        <div>
-          <small>호출 출처</small>
-          <b className="source-text">demo/mock</b>
-        </div>
-      </div>
-      <section className="panel audit-panel">
-        <PanelHeading
-          label="ORDERED EVENT STREAM"
-          title="흐름 이벤트"
-          action={<span className="mock-label">{events.length} EVENTS</span>}
-        />
-        <div className="audit-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>시각 (KST)</th>
-                <th>행위자</th>
-                <th>이벤트</th>
-                <th>결과</th>
-                <th>상세</th>
-                <th>출처</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((event) => (
-                <tr key={event.id}>
-                  <td>{event.at}</td>
-                  <td>{event.actor}</td>
-                  <td>
-                    <code>{event.eventType}</code>
-                  </td>
-                  <td>
-                    <Decision decision={event.decision} />
-                  </td>
-                  <td>{event.detail}</td>
-                  <td>
-                    <span className="mock-label">demo/mock</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="stat">
+          <span>출처</span>
+          <b className="muted">demo/mock</b>
         </div>
       </section>
-      <div className="audit-note">
-        <Icon name="shield" size={17} />
-        <span>
-          <b>로컬 데모 로그입니다.</b>
-          <small>
-            실제 감사 API, Kiln 호출·토큰 사용량, 온체인 거래는 연결되지
-            않았습니다.
-          </small>
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function PanelHeading({
-  label,
-  title,
-  action,
-}: {
-  label: string;
-  title: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="panel-heading">
-      <div>
-        <small>{label}</small>
-        <h2>{title}</h2>
-      </div>
-      {action}
-    </div>
-  );
-}
-function StatusBadge({ status }: { status: string }) {
-  const labels: Record<string, string> = {
-    PROPOSED: "승인 전",
-    AWAITING_APPROVALS: "한쪽 승인",
-    RECORDING: "기록 대기",
-    RECORDED: "기록 완료",
-    CHAIN_FAILED: "체인 실패",
-    BLOCKED: "조건 차단",
-    REJECTED: "거절",
-    EXPIRED: "만료",
-  };
-  const color =
-    status === "RECORDING"
-      ? "blue"
-      : status === "RECORDED"
-        ? "green"
-        : ["BLOCKED", "REJECTED", "EXPIRED", "CHAIN_FAILED"].includes(status)
-          ? "red"
-          : "amber";
-  return (
-    <span className={"status-badge " + color}>
-      <i />
-      {labels[status] ?? status}
-    </span>
-  );
-}
-function EvidenceBadge({ state }: { state: string }) {
-  const label: Record<string, string> = {
-    checked: "확인",
-    seller_claimed: "판매자 주장",
-    conflicted: "모순",
-    unknown: "미확인",
-  };
-  return (
-    <span className={"evidence-badge " + state}>
-      <i />
-      {label[state] ?? state}
-    </span>
-  );
-}
-function Stat({
-  label,
-  value,
-  sub,
-  icon,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  icon: string;
-}) {
-  return (
-    <div className="stat">
-      <span className={"stat-icon " + icon}>
-        <Icon
-          name={icon as "box" | "check" | "negotiation" | "network"}
-          size={16}
-        />
-      </span>
-      <small>{label}</small>
-      <b>{value}</b>
-      <span>{sub}</span>
-    </div>
-  );
-}
-function Flow({
-  n,
-  title,
-  detail,
-  state,
-}: {
-  n: string;
-  title: string;
-  detail: string;
-  state: "done" | "now" | "later";
-}) {
-  return (
-    <div className={"flow-step " + state}>
-      <i>{state === "done" ? <Icon name="check" size={12} /> : n}</i>
-      <span>
-        <b>{title}</b>
-        <small>{detail}</small>
-      </span>
-      <em />
-    </div>
-  );
-}
-function SignStep({
-  number,
-  title,
-  detail,
-  active,
-  done,
-}: {
-  number: string;
-  title: string;
-  detail: string;
-  active: boolean;
-  done: boolean;
-}) {
-  return (
-    <div
-      className={
-        "sign-step" + (active ? " active" : "") + (done ? " done" : "")
-      }
-    >
-      <i>{done ? <Icon name="check" size={12} /> : number}</i>
-      <span>
-        <b>{title}</b>
-        <small>{detail}</small>
-      </span>
-    </div>
-  );
-}
-function WalletAddress({
-  label,
-  address,
-  signed,
-}: {
-  label: string;
-  address: string;
-  signed: boolean;
-}) {
-  return (
-    <div className={"wallet-address" + (signed ? " signed" : "")}>
-      <Icon name="wallet" size={14} />
-      <span>
-        <small>{label}</small>
-        <code>{address}</code>
-      </span>
-      <b>{signed ? "승인 입력" : "대기"}</b>
-    </div>
-  );
-}
-function Decision({ decision }: { decision: AuditEvent["decision"] }) {
-  const labels = {
-    info: "정보",
-    allowed: "통과",
-    blocked: "차단",
-    pending: "대기",
-    rejected: "거절",
-  };
-  return (
-    <span className={"decision " + decision}>
-      <i />
-      {labels[decision]}
-    </span>
-  );
-}
-function OfferRows({
-  evaluations,
-  selectedId,
-  choose,
-  setPage,
-  compact = false,
-  sellerMode = false,
-}: {
-  evaluations: ReturnType<typeof validateOffers>;
-  selectedId?: string;
-  choose?: (id: string) => void;
-  setPage?: (page: PageKey) => void;
-  compact?: boolean;
-  sellerMode?: boolean;
-}) {
-  return (
-    <div className="offer-list">
-      <div className="offer-list-head">
-        <span>판매자 / 매물</span>
-        <span>라운드</span>
-        <span>총액</span>
-        <span>배송</span>
-        <span>검증</span>
-        <span />
-      </div>
-      {evaluations.map((item) => {
-        const listing = DEMO_LISTINGS.find(
-          (candidate) => candidate.id === item.offer.listingId,
-        );
-        return (
-          <div
-            className={
-              "offer-row" + (selectedId === item.offer.id ? " selected" : "")
-            }
-            key={item.offer.id}
-          >
-            <div className="offer-seller">
-              <i className={listing?.accent}>{listing?.sellerName.slice(-2)}</i>
-              <span>
-                <b>{listing?.sellerName}</b>
-                <small>{listing?.model}</small>
-              </span>
-            </div>
-            <div>
-              <b className="round-chip">R{item.offer.round}</b>
-              <small className="subline">
-                {item.offer.proposer === "buyer_agent"
-                  ? "구매 제안"
-                  : "반대 제안"}
-              </small>
-            </div>
-            <div>
-              <b>{money(item.offer.totalKrw)}</b>
-              <small className="subline">
-                상품 {money(item.offer.itemPriceKrw)} + 배송{" "}
-                {money(item.offer.shippingFeeKrw)}
-              </small>
-            </div>
-            <div>{date(item.offer.deliveryBy)}</div>
-            <div>
-              {item.status === "valid" ? (
-                <span className="valid-chip">✓ 유효</span>
-              ) : (
-                <span className="blocked-chip">! 차단</span>
-              )}
-              <small className="subline">
-                {item.status === "valid"
-                  ? "조건 통과 · mock"
-                  : sellerMode
-                    ? "정책 검사 · mock"
-                    : item.reasonCode}
-              </small>
-            </div>
-            <div>
-              {choose ? (
-                <button
-                  className="row-button"
-                  onClick={() => choose(item.offer.id)}
+      <Card title="이벤트 타임라인" sub="최신순 · FLOW-049">
+        <ol className="timeline">
+          {events.map((event) => (
+            <li key={event.id} className={"tl " + event.decision}>
+              <span className="tl-dot" />
+              <div className="tl-body">
+                <div className="tl-top">
+                  <b>{event.actor}</b>
+                  <code>{event.eventType}</code>
+                </div>
+                <p>{event.detail}</p>
+              </div>
+              <div className="tl-side">
+                <span
+                  className={
+                    "pill small tone-" +
+                    (event.decision === "allowed" ? "pass" : event.decision === "pending" ? "info" : event.decision === "info" ? "idle" : "block")
+                  }
                 >
-                  {selectedId === item.offer.id ? "선택됨" : "검토"}
-                </button>
-              ) : setPage ? (
-                <button
-                  className="row-button"
-                  onClick={() => setPage("negotiation")}
-                >
-                  열기 <Icon name="arrow" size={12} />
-                </button>
-              ) : null}
-            </div>
-          </div>
-        );
-      })}
-      {compact && (
-        <div className="table-foot">
-          <span>
-            <Icon name="lock" size={12} /> 비공개 가격 한계는 제안에 포함되지
-            않습니다.
-          </span>
-          <span>표시 정보 · demo/mock</span>
-        </div>
-      )}
-    </div>
-  );
-}
-function DemoNote() {
-  return (
-    <div className="demo-note">
-      <Icon name="alert" size={13} />
-      <span>{DEMO_NOTICE}</span>
-      <i /> <span>실제 API · 지갑 · 체인 미연결</span>
+                  <i />
+                  {label[event.decision]}
+                </span>
+                <time>{event.at.slice(5)}</time>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </Card>
     </div>
   );
 }

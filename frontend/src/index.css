@@ -1,39 +1,33 @@
-:root {
-  font-family: Inter, "Pretendard", "Noto Sans KR", system-ui, sans-serif;
-  color: #202a2b;
-  background: #f6f7f4;
-  font-synthesis: none;
+/* Pretendard (SIL Open Font License 1.1) — bundled subset so every 시안 renders Korean the same way. */
+@font-face { font-family: "Pretendard"; font-weight: 400; font-display: swap; src: url("./assets/fonts/Pretendard-Regular.subset.woff2") format("woff2"); }
+@font-face { font-family: "Pretendard"; font-weight: 500; font-display: swap; src: url("./assets/fonts/Pretendard-Medium.subset.woff2") format("woff2"); }
+@font-face { font-family: "Pretendard"; font-weight: 600; font-display: swap; src: url("./assets/fonts/Pretendard-SemiBold.subset.woff2") format("woff2"); }
+@font-face { font-family: "Pretendard"; font-weight: 700; font-display: swap; src: url("./assets/fonts/Pretendard-Bold.subset.woff2") format("woff2"); }
+@font-face { font-family: "Pretendard"; font-weight: 800; font-display: swap; src: url("./assets/fonts/Pretendard-ExtraBold.subset.woff2") format("woff2"); }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-width: 320px; }
+body {
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.55;
+  word-break: keep-all;
+  overflow-wrap: break-word;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  font-optical-sizing: auto;
-  font-weight: 400;
-  font-size: 14px;
-  font-feature-settings: "ss01" on;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
 }
-* {
-  box-sizing: border-box;
-}
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-}
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
-button {
-  cursor: pointer;
-}
-button:disabled {
-  cursor: not-allowed;
-}
-a {
-  color: inherit;
-}
-::selection {
-  background: #bce8d8;
-  color: #18322d;
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+h1, h2, h3, p, dl, dd, ul, ol { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+a { color: inherit; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
