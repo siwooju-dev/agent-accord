@@ -49,3 +49,13 @@ cd contracts && npm ci && npm run compile && cd ..
 ```
 
 스크립트는 브로드캐스트 **전** 배포 tx hash를 출력한다. 응답이 끊기면 그 hash를 먼저 조회한다. 성공 영수증의 `contract_address`를 `CONTRACT_ADDRESS`로 설정해야 이후 EIP-712 도메인이 고정된다. 배포 뒤 프론트·백엔드 담당에게 `CHAIN_ID`, `CONTRACT_ADDRESS`, ABI, 해시 테스트 벡터를 전달한다. 테스트넷 기록을 제출 증거로 사용할 때는 tx hash, 성공 영수증, 이벤트, `getAgreement` 조회값을 함께 남긴다.
+
+## 직접 실행: Anvil → Base Sepolia
+
+1. 로컬 devnet에서는 별도 터미널에 `anvil --chain-id 31337`을 실행한다. Anvil 화면에 표시되는 **개발 전용** 계정 중 하나를 relayer로 사용한다. 그 키를 공개 테스트넷이나 실제 자산 지갑에 재사용하지 않는다.
+2. 저장소 루트에서 `cp .env.example .env` 후 `.env`에 `CHAIN_RPC_URL=http://127.0.0.1:8545`, `CHAIN_ID=31337`, `RELAYER_PRIVATE_KEY=<Anvil 개발 계정 키>`를 설정한다. `CONTRACT_ADDRESS`는 배포 전에는 빈 값이다. `.env`는 Git에서 제외되며 `chmod 600 .env`로 권한을 제한한다.
+3. `set -a; source .env; set +a`로 환경을 읽고 `cd contracts && npm ci && npm run compile && cd ..`를 실행한다. 이어 `.venv/bin/python -m blockchain.deploy`로 배포한다. 출력된 `contract_address`를 `.env`의 `CONTRACT_ADDRESS`에 적고 환경을 다시 읽는다.
+4. `.venv/bin/python -m blockchain.smoke`를 실행한다. 출력된 `status=success`, `tx_hash`, `block_number`, `agreement_hash`를 확인한다. `tx_recovery_file`은 브로드캐스트 전에 tx hash를 저장한 로컬 파일이며 `.local/`에 남는다. 응답이 끊기면 이 파일의 해시를 조회하고 동일 작업을 무작정 재전송하지 않는다.
+5. Base Sepolia에서는 **별도 테스트 전용 relayer 지갑**에 [테스트 ETH](https://docs.base.org/get-started/get-funds)를 받은 뒤 `.env`를 `CHAIN_RPC_URL=https://sepolia.base.org`, `CHAIN_ID=84532`, `CHAIN_EXPLORER_URL=https://sepolia.basescan.org`, 해당 테스트 지갑의 `RELAYER_PRIVATE_KEY`로 바꾼다. [공식 네트워크 값](https://docs.base.org/get-started/connect-to-base)을 확인하고 로컬 계약 주소를 재사용하지 말고 새로 배포한 주소를 `CONTRACT_ADDRESS`에 넣어 3~4단계를 반복한다. 배포 전 `cast chain-id --rpc-url "$CHAIN_RPC_URL"` 결과가 `84532`인지 확인한다. 공개 RPC가 느리거나 제한되면 같은 Base Sepolia의 다른 RPC를 설정한다.
+
+`blockchain.smoke`는 매번 **임시 구매자·판매자 테스트 지갑**을 생성해 둘 다 코드로 서명한다. 따라서 계약·RPC·어댑터의 전체 경로를 확인할 수 있지만, 실제 구매자·판매자가 화면에서 승인했다는 증거는 아니다. 이 사용자 흐름은 프론트와 백엔드 연동 후 따로 검증한다. 테스트 ETH는 relayer의 배포·기록 가스에만 필요하다. 실제 물품이나 원화 결제는 일어나지 않는다.

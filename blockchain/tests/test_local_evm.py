@@ -13,6 +13,7 @@ from web3.providers.eth_tester import EthereumTesterProvider
 
 from blockchain import AgreementChain, ChainConfig, ChainError, SubmissionUnknown, approval_payload
 from blockchain.deploy import deploy_contract
+from blockchain.smoke import run_smoke
 from blockchain.tests.test_signing import VECTOR
 
 
@@ -209,3 +210,16 @@ def test_reverted_transaction_is_failed(local_chain):
         buyer_sig, seller_sig,
     ).transact({"from": chain.relayer.address, "gas": 400000})
     assert chain.get_record(Web3.to_hex(duplicate_hash), agreement["snapshot_hash"])["status"] == "failed"
+
+
+def test_synthetic_smoke_records_and_persists_hash(local_chain, tmp_path):
+    chain, _, _, _ = local_chain
+    tx_file = tmp_path / "smoke-tx.json"
+    result = run_smoke(chain, tx_file, receipt_timeout=0)
+    persisted = json.loads(tx_file.read_text(encoding="utf-8"))
+    assert result["mode"] == "synthetic_wallet_smoke"
+    assert result["status"] == "success"
+    assert persisted["agreement_hash"] == result["agreement_hash"]
+    assert persisted["tx_hash"] == result["tx_hash"]
+    with pytest.raises(ChainError, match="already exists"):
+        run_smoke(chain, tx_file)
