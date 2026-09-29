@@ -59,3 +59,7 @@ cd contracts && npm ci && npm run compile && cd ..
 5. Base Sepolia에서는 **별도 테스트 전용 relayer 지갑**에 [테스트 ETH](https://docs.base.org/get-started/get-funds)를 받은 뒤 `.env`를 `CHAIN_RPC_URL=https://sepolia.base.org`, `CHAIN_ID=84532`, `CHAIN_EXPLORER_URL=https://sepolia.basescan.org`, 해당 테스트 지갑의 `RELAYER_PRIVATE_KEY`로 바꾼다. [공식 네트워크 값](https://docs.base.org/get-started/connect-to-base)을 확인하고 로컬 계약 주소를 재사용하지 말고 새로 배포한 주소를 `CONTRACT_ADDRESS`에 넣어 3~4단계를 반복한다. 배포 전 `cast chain-id --rpc-url "$CHAIN_RPC_URL"` 결과가 `84532`인지 확인한다. 공개 RPC가 느리거나 제한되면 같은 Base Sepolia의 다른 RPC를 설정한다.
 
 `blockchain.smoke`는 매번 **임시 구매자·판매자 테스트 지갑**을 생성해 둘 다 코드로 서명한다. 따라서 계약·RPC·어댑터의 전체 경로를 확인할 수 있지만, 실제 구매자·판매자가 화면에서 승인했다는 증거는 아니다. 이 사용자 흐름은 프론트와 백엔드 연동 후 따로 검증한다. 테스트 ETH는 relayer의 배포·기록 가스에만 필요하다. 실제 물품이나 원화 결제는 일어나지 않는다.
+
+## Base Sepolia 배포 증거
+
+실제 배포 주소, 배포 및 기록 tx hash, 블록 번호, 합의 해시, 검증 범위는 [`deployments/base-sepolia.json`](deployments/base-sepolia.json)에 남겼다. 두 tx 모두 성공 영수증을 받았고, 기록 tx는 `AgreementRecorded` 이벤트와 `getAgreement` 조회값을 대조했다. 기록에 사용한 구매자·판매자 서명은 smoke 명령이 생성한 임시 테스트 지갑의 서명이며, 두 실제 사용자의 UI 승인을 검증한 결과는 아니다.

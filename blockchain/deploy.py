@@ -7,12 +7,32 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 
 from eth_account import Account
 from web3 import Web3
+from web3.exceptions import BadFunctionCallOutput
 
 from .adapter import ChainError
+
+
+def _verify_relayer(contract, expected_address: str, *, attempts: int = 15) -> None:
+    """Public RPCs may return a receipt before their contract-call backend catches up."""
+    for attempt in range(attempts):
+        try:
+            actual = contract.functions.relayer().call()
+        except BadFunctionCallOutput as exc:
+            if attempt == attempts - 1:
+                raise ChainError(
+                    "deployment confirmed but contract verification unavailable; "
+                    "reconcile the printed tx hash before retrying"
+                ) from exc
+            time.sleep(2)
+            continue
+        if actual.lower() != expected_address.lower():
+            raise ChainError("deployed relayer mismatch")
+        return
 
 
 def deploy_contract(web3: Web3, chain_id: int, key: str) -> dict[str, int | str]:
@@ -51,8 +71,7 @@ def deploy_contract(web3: Web3, chain_id: int, key: str) -> dict[str, int | str]
     if receipt["status"] != 1 or not receipt["contractAddress"]:
         raise ChainError("deployment failed")
     contract = web3.eth.contract(address=receipt["contractAddress"], abi=abi)
-    if contract.functions.relayer().call() != relayer.address:
-        raise ChainError("deployed relayer mismatch")
+    _verify_relayer(contract, relayer.address)
     return {
         "chain_id": chain_id,
         "contract_address": receipt["contractAddress"],

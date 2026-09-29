@@ -9,10 +9,11 @@ from eth_account import Account
 from eth_account.messages import encode_typed_data
 from eth_tester.exceptions import TransactionFailed
 from web3 import Web3
+from web3.exceptions import BadFunctionCallOutput
 from web3.providers.eth_tester import EthereumTesterProvider
 
 from blockchain import AgreementChain, ChainConfig, ChainError, SubmissionUnknown, approval_payload
-from blockchain.deploy import deploy_contract
+from blockchain.deploy import _verify_relayer, deploy_contract
 from blockchain.smoke import run_smoke
 from blockchain.tests.test_signing import VECTOR
 
@@ -176,6 +177,29 @@ def test_deployment_command_signs_and_checks_contract(capsys):
     assert f"deployment_tx_hash={result['deployment_tx_hash']}" in output
     assert result["block_number"] > 0
     assert web3.eth.get_code(result["contract_address"])
+
+
+def test_deployment_verification_waits_for_rpc_contract_call(monkeypatch):
+    class FlakyContract:
+        functions = None
+
+        def __init__(self):
+            self.functions = self
+            self.calls = 0
+
+        def relayer(self):
+            return self
+
+        def call(self):
+            self.calls += 1
+            if self.calls == 1:
+                raise BadFunctionCallOutput("RPC has not indexed deployed code")
+            return "0x8BCaC1A451EAC500477E3EE70e123D71127a88D9"
+
+    monkeypatch.setattr("blockchain.deploy.time.sleep", lambda _: None)
+    contract = FlakyContract()
+    _verify_relayer(contract, "0x8BCaC1A451EAC500477E3EE70e123D71127a88D9", attempts=2)
+    assert contract.calls == 2
 
 
 def test_pending_then_confirmed_receipt(local_chain):
