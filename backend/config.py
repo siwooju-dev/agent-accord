@@ -26,6 +26,25 @@ def _deployed_contract() -> str:
         return ""
 
 
+def load_local_env(paths: tuple[Path, ...] = (ROOT / ".env.local", ROOT / ".env")) -> None:
+    """Read git-ignored env files (written by scripts/setup_secrets.py). Real env vars win."""
+    if os.getenv("ACCORD_ENV_FILE", "on").strip().lower() == "off":
+        return
+    for path in paths:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key, value = key.strip(), value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
 def _env_bool(name: str, default: bool) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -58,6 +77,7 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> Settings:
+        load_local_env()
         mode = os.getenv("APP_MODE", "mock").strip().lower()
         actors: dict[str, dict[str, str]] = dict(DEFAULT_ACTORS)
         raw_actors = os.getenv("DEMO_ACTORS_JSON", "").strip()
