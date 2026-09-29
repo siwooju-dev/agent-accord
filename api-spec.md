@@ -144,6 +144,8 @@ MVP 수수료는 `0 KRW`다. 따라서 `total_krw = item_price_krw + shipping_fe
 | 확정 성공 | 위 필드와 `receipt_status: success`, `block_number`, `event_name: AgreementRecorded`, `recorded_hash`; 이벤트와 `getAgreement`의 해시·당사자·총액·nonce 일치 |
 | 실패 | `receipt_status: failed`, `reason_code: CHAIN_FAILED`; `RECORDED`로 표시 금지 |
 
+양측 승인이 끝났지만 서버에 `RELAYER_PRIVATE_KEY`가 주입되지 않은 경우에도 합의 상태는 `RECORDING`으로 유지한다. 이때 `chain`은 `mode: testnet`, `chain_id: 84532`, `tx_hash: null`, `receipt_status: null`, `submission_state: relayer_missing`, `reason_code: RELAYER_NOT_CONFIGURED_FOR_LIVE_SUBMISSION`을 반환한다. 이 값은 제출 대기 상태이며 체인 제출이나 기록 성공을 뜻하지 않는다. 개인키가 배포 환경에 주입되면 동일한 승인 재시도 또는 상태 polling이 안전하게 제출 처리를 시작할 수 있다. 저장된 tx hash가 있으면 항상 그 hash를 재조회하고 새 tx를 만들지 않는다.
+
 mock 체인을 쓴 로컬 테스트라면 `mode=mock`, `tx_hash=null`로 표시한다. 실제 영수증·이벤트·계약 조회값이 합의 해시와 일치한 후에만 상태를 `RECORDED`로 바꾼다.
 
 ### 4.8 `GET /api/agreements/{id}/approval-payload`
@@ -171,7 +173,7 @@ EIP-712 타입 문자열은 `AgreementApproval(bytes32 agreementHash,address buy
 
 승인 요청: `{ "decision": "approve", "snapshot_hash": "0x<64 hex>", "signature": "0x<wallet signature>" }`. 거절 요청: `{ "decision": "reject", "snapshot_hash": "0x<64 hex>" }`. `signature`는 승인 시에만 필수다. 서버는 세션 사용자·기대 지갑·EIP-712 서명·스냅샷 해시·만료를 확인한다.
 
-응답 `200`: `{ "request_id": "req-9", "agreement_id": "agreement-demo-1", "status": "AWAITING_APPROVALS", "buyer_approved": true, "seller_approved": false, "chain": { "tx_hash": null } }`. 두 번째 유효 서명이 들어오면 `status=RECORDING`으로 바꾸고 **서버 relayer**가 기록 트랜잭션을 제출한다. 동일한 결정을 재전송해도 서명이나 체인 기록을 중복 생성하지 않는다. 거절·만료·다른 해시의 서명은 온체인 제출을 막는다.
+응답 `200`: `{ "request_id": "req-9", "agreement_id": "agreement-demo-1", "status": "AWAITING_APPROVALS", "buyer_approved": true, "seller_approved": false, "chain": { "tx_hash": null } }`. 두 번째 유효 서명이 들어오면 `status=RECORDING`으로 바꾸고, 설정된 경우 **서버 relayer**가 기록 트랜잭션을 제출한다. relayer가 없으면 `RECORDING`과 위의 `relayer_missing` chain 상태를 반환하며 `RECORDED` 또는 임의 tx hash를 만들지 않는다. 동일한 결정을 재전송해도 승인이나 체인 기록을 중복 생성하지 않는다. 거절·만료·다른 해시의 서명은 온체인 제출을 막는다.
 
 ### 4.10 `GET /api/flows/{id}/audit`
 
@@ -194,7 +196,7 @@ EIP-712 타입 문자열은 `AgreementApproval(bytes32 agreementHash,address buy
 ## 6. 상태·전이
 
 - 협상: `DRAFT → NEGOTIATING → PROPOSED → AWAITING_APPROVALS`; 유효 후보가 없거나 모든 제안이 차단되면 `NO_MATCH/BLOCKED`로 끝난다.
-- 합의: `AWAITING_APPROVALS → RECORDING → RECORDED`. 한쪽 거절은 `REJECTED`, 만료는 `EXPIRED`, 영수증/이벤트 확인 실패는 `CHAIN_FAILED`다.
+- 합의: `AWAITING_APPROVALS → RECORDING → RECORDED`. `RECORDING`은 양측 승인 완료 상태이며, relayer 미설정이면 제출 대기(`chain.submission_state=relayer_missing`)로 유지한다. 한쪽 거절은 `REJECTED`, 만료는 `EXPIRED`, 영수증/이벤트 확인 실패는 `CHAIN_FAILED`다.
 - 제안 내용·금액·배송·증빙 해시가 바뀌면 **새 `Agreement`/해시/nonce**를 만들고 이전 서명을 재사용하지 않는다.
 - `RECORDED`는 실제 테스트넷 영수증 성공과 `AgreementRecorded` 이벤트/계약 상태 대조를 모두 완료한 경우만 쓴다. AI가 낸 제안이나 양측 웹 승인만으로 거래 성공으로 표시하지 않는다.
 
@@ -220,7 +222,7 @@ EIP-712 타입 문자열은 `AgreementApproval(bytes32 agreementHash,address buy
 | `422` | 금액·기한·필수 조건의 유효성 실패 |
 | `503` | Kiln 또는 체인 설정/연결 불가; mock 성공으로 대체하지 않음 |
 
-`reason_code`의 최소 집합: `BUDGET_EXCEEDED`, `SELLER_FLOOR_VIOLATED`, `DEADLINE_MISSED`, `OUT_OF_STOCK`, `MUST_HAVE_UNMET`, `OFFER_EXPIRED`, `SIGNATURE_INVALID`, `CHAIN_CONFIG_UNAVAILABLE`, `CHAIN_FAILED`, `KILN_UNAVAILABLE`. 협상 중 차단은 전체 HTTP 오류로 바꾸지 않고 `AuditEvent`와 `blocked_events`에 기록한다.
+`reason_code`의 최소 집합: `BUDGET_EXCEEDED`, `SELLER_FLOOR_VIOLATED`, `DEADLINE_MISSED`, `OUT_OF_STOCK`, `MUST_HAVE_UNMET`, `OFFER_EXPIRED`, `SIGNATURE_INVALID`, `CHAIN_CONFIG_UNAVAILABLE`, `CHAIN_FAILED`, `RELAYER_NOT_CONFIGURED_FOR_LIVE_SUBMISSION`, `KILN_UNAVAILABLE`. 협상 중 차단은 전체 HTTP 오류로 바꾸지 않고 `AuditEvent`와 `blocked_events`에 기록한다.
 
 ## 8. 내부 어댑터와 환경 설정
 
