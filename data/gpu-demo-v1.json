@@ -110,7 +110,9 @@
       "kind": "seller_condition_note",
       "source": "demo/synthetic",
       "ref": "synthetic://gpu-demo-v1/listing-01/condition-note",
-      "sha256": null,
+      "sha256": "0x9f4dd752641fd9a54e9ac431ee049846d2513308baae7204a86f84bc009fb08d",
+      "content_text": "판매자 주장: RTX 4080은 정상 작동하며 약 18개월 사용했습니다. 작동 시험 기록과 실물 사진은 제공되지 않았습니다.",
+      "metadata": {"claimed_use_months": 18, "operational_test": "not_provided"},
       "uploaded_by": "seller-demo-01",
       "uploaded_at": "2026-09-29T00:00:00Z",
       "verification_status": "seller_claimed",
@@ -124,7 +126,9 @@
       "kind": "seller_warranty_claim",
       "source": "demo/synthetic",
       "ref": "synthetic://gpu-demo-v1/listing-02/seller-description",
-      "sha256": null,
+      "sha256": "0xeee8f9a8594d67e0997bdbeb685b725deafa22885cd5bb42f0c0d7cc2a134155",
+      "content_text": "판매자 설명: 이 RTX 4080에는 남은 제조사 보증이 없습니다. 보증 종료일을 제시하지 않았습니다.",
+      "metadata": {"warranty_claim": "none"},
       "uploaded_by": "seller-demo-02",
       "uploaded_at": "2026-09-29T00:00:00Z",
       "verification_status": "conflicted",
@@ -138,13 +142,15 @@
       "kind": "synthetic_warranty_card",
       "source": "demo/synthetic",
       "ref": "synthetic://gpu-demo-v1/listing-02/warranty-card",
-      "sha256": null,
+      "sha256": "0x0620e10ae5b7ef7b454a27e53afdbae6e425f78e2700cca0e3929e2be27b5daa",
+      "content_text": "가상 보증 카드: RTX 4080 제품에 제조사 보증이 남아 있다고 표기합니다. 발급처와 원본 조회는 확인되지 않았습니다.",
+      "metadata": {"warranty_claim": "active", "issuer_checked": false},
       "uploaded_by": "seller-demo-02",
       "uploaded_at": "2026-09-29T00:00:00Z",
       "verification_status": "conflicted",
       "verification_method": null,
       "verified_by": null,
-      "note": "가상 카드에는 보증 종료일 2026-11-30으로 기재되어 설명과 충돌함. 실제 보증 확인 자료가 아님."
+      "note": "가상 카드의 보증 잔여 주장과 판매자 설명이 충돌함. 실제 보증 확인 자료가 아님."
     },
     {
       "id": "evidence-03a",
@@ -152,7 +158,9 @@
       "kind": "seller_warranty_claim",
       "source": "demo/synthetic",
       "ref": "synthetic://gpu-demo-v1/listing-03/warranty-note",
-      "sha256": null,
+      "sha256": "0xd47b76e112005c1209ae2434ce527a29c9b550186ab2e6e804365b7f7492bad7",
+      "content_text": "판매자 주장: RTX 4080 제조사 보증 기간이 남아 있습니다. 구매 영수증과 제조사 조회 결과는 제공되지 않았습니다.",
+      "metadata": {"warranty_claim": "active", "issuer_checked": false},
       "uploaded_by": "seller-demo-03",
       "uploaded_at": "2026-09-29T00:00:00Z",
       "verification_status": "seller_claimed",
@@ -178,7 +186,7 @@
       "intent_id": "intent-deadline-short",
       "expected_candidate_listing_ids": ["listing-01", "listing-03"],
       "expected_listed_price_budget_pass_listing_ids": ["listing-01", "listing-03"],
-      "notes": "배송 마감 2026-10-03 조건에서 listing-02는 배송 가능일이 늦어 검색 후보에서 제외한다. 나머지 두 매물은 현재 제시 총액 기준 예산 이내다."
+      "notes": "단축된 배송 마감 조건에서 listing-02는 배송 가능일이 늦어 검색 후보에서 제외한다. 나머지 두 매물은 현재 제시 총액 기준 예산 이내다."
     }
   ],
   "runtime_records": {
