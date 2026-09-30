@@ -1,8 +1,8 @@
 # Agent Accord
 
-**Agent Accord lets Kiln-powered AI agents negotiate a used-GPU deal for a buyer and a seller within each side's private limits, and records the agreement on Base Sepolia only after both people sign the same terms with their own wallets.**
+**English** · [한국어](README.ko.md)
 
-> 한 줄 소개: 구매자와 판매자가 조건만 정하면 Kiln(Qwen3-32B) 에이전트가 증빙을 검토하고 서로의 비공개 한도 안에서 흥정하며, 두 사람이 같은 합의서에 지갑으로 서명하면 그 합의를 Base Sepolia에 기록합니다.
+**Agent Accord lets Kiln-powered AI agents negotiate a used-GPU deal for a buyer and a seller within each side's private limits, and records the agreement on Base Sepolia only after both people sign the same terms with their own wallets.**
 
 Track A · GWDC 2026 × Bricksum · Repository: `release` branch
 
@@ -119,7 +119,7 @@ cd frontend && ACCORD_API_TARGET=http://127.0.0.1:8001 npm run dev -- --host 127
 In the app, sign in with **구매자로 로그인** (account 1), pick a condition under **조건 · 매물**, and press **이 조건으로 협상 시작**. Watch the agents talk under **협상**, then sign under **합의 · 서명**. Log out, switch MetaMask to account 2, sign in with **판매자로 로그인**, and sign the same agreement. **기록** shows every event, each Kiln call and the BaseScan link.
 
 - Scripted runs: `.venv/bin/python scripts/run_flows.py A B C`.
-- Rebuild the proof: `scripts/export_proof.py --db data/live.sqlite3 --db data/live-script.sqlite3 --verify --publish --flow … --label …`.
+- Rebuild the proof: `scripts/export_proof.py --db data/live.sqlite3 --db data/live-script.sqlite3 --verify --publish --flow … --label …` (updates the proof table in README.md and README.ko.md).
 - Share over ngrok and run the full QA checklist: [`docs/WEB_QA.md`](docs/WEB_QA.md).
 
 Keys live only in the git-ignored `.env.local` (mode 600) and the backend process, never in the browser bundle. Live mode accepts only the configured buyer and seller wallets. Each buyer wallet can start 20 negotiations an hour (`NEGOTIATIONS_PER_HOUR`).

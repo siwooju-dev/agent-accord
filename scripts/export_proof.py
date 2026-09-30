@@ -205,17 +205,17 @@ def main() -> int:
     if not args.publish:
         report_path.chmod(0o600)
     if args.publish:
-        # Keep the README summary in sync only after an explicit publication choice.
-        readme = ROOT / "README.md"
+        # Keep the README summaries (English and Korean) in sync only after an explicit publication choice.
         start, end = "<!-- proof:start -->", "<!-- proof:end -->"
-        text = readme.read_text(encoding="utf-8") if readme.exists() else ""
-        if start in text and end in text:
-            summary_start = out.index("## Summary") + 2
-            summary_end = next(i for i in range(summary_start, len(out)) if out[i].startswith("## "))
-            block = "\n".join([start, "", *out[summary_start:summary_end], "Full per-call log: [docs/PROOF.md](docs/PROOF.md)", "", end])
-            text = text[: text.index(start)] + block + text[text.index(end) + len(end):]
-            readme.write_text(text, encoding="utf-8")
-            print("updated README proof block")
+        summary_start = out.index("## Summary") + 2
+        summary_end = next(i for i in range(summary_start, len(out)) if out[i].startswith("## "))
+        block = "\n".join([start, "", *out[summary_start:summary_end], "Full per-call log: [docs/PROOF.md](docs/PROOF.md)", "", end])
+        for readme in (ROOT / "README.md", ROOT / "README.ko.md"):
+            text = readme.read_text(encoding="utf-8") if readme.exists() else ""
+            if start in text and end in text:
+                text = text[: text.index(start)] + block + text[text.index(end) + len(end):]
+                readme.write_text(text, encoding="utf-8")
+                print(f"updated {readme.name} proof block")
     print(f"flows: {len(flows)} · kiln calls: {len(exported_calls)} · cost ${total_cost:.6f}")
     print(f"wrote {report_path.relative_to(ROOT)} and {output_docs.relative_to(ROOT)}/proof/*")
     return 0
