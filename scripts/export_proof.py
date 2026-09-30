@@ -1,0 +1,225 @@
+"""Export per-flow proof (Kiln calls + on-chain transactions) for the README.
+
+    .venv/bin/python scripts/export_proof.py --db data/live.sqlite3 \
+        --label flow_abc="기본 흐름" --label flow_def="예산 변경" --verify
+
+Writes private output under .local/proof-export by default. Add --publish to update tracked docs and
+README proof content. Only flows with a Kiln call are exported (pass --flow to choose). The Kiln
+log holds no prompt text and no key; each line carries generation id, token counts and usage cost.
+With --verify, every transaction hash is re-checked against the RPC (receipt status and block).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sqlite3
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from backend.config import load_local_env  # noqa: E402
+
+DOCS = ROOT / "docs"
+# Stated assumption for a rough estimate; Kiln does not report energy. Change it if you have a better figure.
+ENERGY_WH_PER_1K_TOKENS = 0.3
+STEP_LABEL = {"assessment": "증빙 검토", "buyer_offer": "구매 제안", "seller_reply": "판매 응답", "buyer_reply": "구매 답변"}
+
+
+def rows(conn: sqlite3.Connection, kind: str) -> list[dict]:
+    result = conn.execute("SELECT id, payload, created_at FROM entities WHERE kind=? ORDER BY rowid", (kind,))
+    return [{"id": row[0], "created_at": row[2], **json.loads(row[1])} for row in result]
+
+
+def won(value: int | None) -> str:
+    return "-" if value is None else f"{value:,}원"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--db", action="append", default=[], help="database (repeatable; default data/live.sqlite3)")
+    parser.add_argument("--log", default="data/kiln_calls.jsonl")
+    parser.add_argument("--flow", action="append", default=[], help="flow id to export (repeatable)")
+    parser.add_argument("--label", action="append", default=[], help="flow_id=표시 이름")
+    parser.add_argument("--verify", action="store_true", help="re-check tx receipts on the RPC")
+    parser.add_argument("--publish", action="store_true", help="write proof data into tracked docs and README")
+    args = parser.parse_args()
+    if args.publish and not args.flow:
+        parser.error("--publish requires at least one explicit --flow selection")
+    load_local_env()
+    import os
+
+    output_docs = DOCS if args.publish else ROOT / ".local" / "proof-export"
+    output_docs.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if not args.publish:
+        output_docs.chmod(0o700)
+    explorer = os.getenv("CHAIN_EXPLORER_URL", "https://sepolia.basescan.org").rstrip("/")
+    labels = dict(item.split("=", 1) for item in args.label)
+    connections = [sqlite3.connect(f"file:{(ROOT / db) if not Path(db).is_absolute() else Path(db)}?mode=ro", uri=True)
+                   for db in (args.db or ["data/live.sqlite3"])]
+    browser_buyer = os.getenv("DEMO_BUYER_WALLET", "").lower()
+
+    log_path = (ROOT / args.log) if not Path(args.log).is_absolute() else Path(args.log)
+    calls: list[dict] = []
+    if log_path.exists():
+        calls = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    intents, agreements, listings, negotiations = {}, {}, {}, []
+    for conn in connections:
+        intents.update({item["id"]: item for item in rows(conn, "intent")})
+        agreements.update({item["id"]: item for item in rows(conn, "agreement")})
+        listings.update({item["id"]: item for item in rows(conn, "listing")})
+        negotiations += [(conn, item) for item in rows(conn, "negotiation")]
+    wanted = set(args.flow) or {call["flow_id"] for call in calls if call.get("flow_id")}
+
+    web3 = None
+    if args.verify:
+        from web3 import Web3
+
+        web3 = Web3(Web3.HTTPProvider(os.getenv("CHAIN_RPC_URL", "https://sepolia.base.org"), request_kwargs={"timeout": 20}))
+
+    deployment = json.loads((ROOT / "blockchain/deployments/base-sepolia.json").read_text(encoding="utf-8"))
+    flows, exported_calls = [], []
+    for conn, negotiation in negotiations:
+        flow_id = negotiation["flow_id"]
+        if flow_id not in wanted:
+            continue
+        intent = intents.get(negotiation.get("buyer_intent_id"), {})
+        agreement = agreements.get(negotiation.get("agreement_id") or "", {})
+        chain = agreement.get("chain") or {}
+        flow_calls = [call for call in calls if call.get("flow_id") == flow_id]
+        events = [{"at": row[0], "actor": row[1], "event_type": row[2], "object_id": row[3], "reason_code": row[4]}
+                  for row in conn.execute("SELECT at, actor, event_type, object_id, reason_code FROM audit_events "
+                                          "WHERE flow_id=? ORDER BY at, rowid", (flow_id,))]
+        skipped = [event for event in events if event["event_type"] == "CANDIDATE_BLOCKED"]
+        exported_calls += flow_calls
+        verified = None
+        if web3 and chain.get("tx_hash"):
+            receipt = web3.eth.get_transaction_receipt(chain["tx_hash"])
+            verified = {"status": receipt["status"], "block_number": receipt["blockNumber"],
+                        "to": receipt["to"], "logs": len(receipt["logs"])}
+        flows.append({
+            "flow_id": flow_id,
+            "label": labels.get(flow_id, flow_id),
+            "signed_by": None if not agreement else (
+                "MetaMask in the web UI" if (agreement.get("snapshot") or {}).get("buyer_wallet") == browser_buyer
+                else "local test wallets via scripts/run_flows.py"),
+            "started_at": negotiation["created_at"],
+            "intent": {key: intent.get(key) for key in ("gpu_model", "max_total_krw", "delivery_deadline", "must_have")},
+            "negotiation_status": negotiation.get("status"),
+            "blocked": [item.get("reason_code") for item in negotiation.get("blocked_events", [])],
+            "offers": [{"listing_id": offer["listing_id"], "title": listings.get(offer["listing_id"], {}).get("title"),
+                        "round": offer["round"], "total_krw": offer["total_krw"]} for offer in negotiation.get("offers", [])],
+            "agreement": {
+                "id": agreement.get("id"), "status": agreement.get("status"),
+                "listing_id": (agreement.get("snapshot") or {}).get("listing_id"),
+                "total_krw": (agreement.get("snapshot") or {}).get("total_krw"),
+                "snapshot_hash": agreement.get("snapshot_hash"),
+                "buyer_wallet": (agreement.get("snapshot") or {}).get("buyer_wallet"),
+                "seller_wallet": (agreement.get("snapshot") or {}).get("seller_wallet"),
+                "tx_hash": chain.get("tx_hash"), "block_number": chain.get("block_number"),
+                "receipt_status": chain.get("receipt_status"), "rpc_check": verified,
+            } if agreement else None,
+            "events": events,
+            "skipped_candidates": [{"listing_id": event["object_id"], "reason_code": event["reason_code"]} for event in skipped],
+            "kiln": {
+                "calls": len(flow_calls),
+                "ok": sum(1 for call in flow_calls if call.get("outcome") == "OK"),
+                "input_tokens": sum(call.get("input_tokens") or 0 for call in flow_calls),
+                "output_tokens": sum(call.get("output_tokens") or 0 for call in flow_calls),
+                "cost_usd": round(sum(call.get("cost_usd") or 0 for call in flow_calls), 8),
+            },
+        })
+
+    order = list(labels)
+    flows.sort(key=lambda flow: (order.index(flow["flow_id"]) if flow["flow_id"] in order else len(order), flow["started_at"]))
+    exported_calls.sort(key=lambda call: (order.index(call["flow_id"]) if call.get("flow_id") in order else len(order), call.get("at", "")))
+    (output_docs / "proof").mkdir(parents=True, exist_ok=True, mode=0o700)
+    if not args.publish:
+        (output_docs / "proof").chmod(0o700)
+    flows_path = output_docs / "proof" / "flows.json"
+    calls_path = output_docs / "proof" / "kiln_calls.jsonl"
+    report_path = output_docs / "PROOF.md"
+    flows_path.write_text(json.dumps(flows, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (output_docs / "proof" / "kiln_calls.jsonl").write_text(
+        "".join(json.dumps(call, ensure_ascii=False, separators=(",", ":")) + "\n" for call in exported_calls),
+        encoding="utf-8")
+    if not args.publish:
+        for path in (flows_path, calls_path):
+            path.chmod(0o600)
+
+    out = ["# Proof of API usage", "",
+           "Generated by `scripts/export_proof.py` from the backend database and the Kiln call log. "
+           "Raw data: [`proof/flows.json`](proof/flows.json), [`proof/kiln_calls.jsonl`](proof/kiln_calls.jsonl).", "",
+           "## Contract", "",
+           f"- Network: Base Sepolia (chain {deployment['chain_id']})",
+           f"- AgreementRegistry: [`{deployment['contract_address']}`]({explorer}/address/{deployment['contract_address']})",
+           f"- Deployment tx: [`{deployment['deployment']['tx_hash']}`]({explorer}/tx/{deployment['deployment']['tx_hash']})",
+           f"- Relayer (only address allowed to record): `{deployment['relayer_address']}`", ""]
+    total_cost = sum(flow["kiln"]["cost_usd"] for flow in flows)
+    out += ["## Summary", "", "| Flow | Buyer condition | Kiln calls | Kiln cost | Agreement | Signed by | On-chain tx |", "|---|---|---|---|---|---|---|"]
+    for flow in flows:
+        intent, agreement = flow["intent"], flow["agreement"] or {}
+        tx = agreement.get("tx_hash")
+        out.append(
+            f"| {flow['label']} | {intent.get('gpu_model')} · 예산 {won(intent.get('max_total_krw'))} · 기한 {(intent.get('delivery_deadline') or '')[:10]} "
+            f"| {flow['kiln']['ok']}/{flow['kiln']['calls']} | ${flow['kiln']['cost_usd']:.6f} "
+            f"| {agreement.get('status', flow['negotiation_status'])} {won(agreement.get('total_krw')) if agreement else ''} "
+            f"| {flow['signed_by'] or '-'} "
+            f"| {f'[`{tx[:10]}…{tx[-6:]}`]({explorer}/tx/{tx})' if tx else '-'} |")
+    total_tokens = sum(flow["kiln"]["input_tokens"] + flow["kiln"]["output_tokens"] for flow in flows)
+    total_skipped = sum(len(flow["skipped_candidates"]) for flow in flows)
+    out += ["", f"- Total Kiln cost for these flows: ${total_cost:.6f} · {total_tokens:,} tokens",
+            f"- Model calls avoided: {total_skipped} candidate(s) failed the server's budget/deadline pre-check, so no "
+            "Kiln call was made for them (about 3 calls each: assessment, buyer offer, seller reply).",
+            f"- Energy (assumption, not a measurement): at {ENERGY_WH_PER_1K_TOKENS} Wh per 1,000 tokens, "
+            f"≈ {total_tokens / 1000 * ENERGY_WH_PER_1K_TOKENS:.2f} Wh for these flows.", ""]
+    for flow in flows:
+        agreement = flow["agreement"] or {}
+        out += [f"## {flow['label']}", "",
+                f"- Flow ID: `{flow['flow_id']}` · started {flow['started_at']}",
+                f"- Buyer intent: `{json.dumps(flow['intent'], ensure_ascii=False)}`",
+                f"- Negotiation result: {flow['negotiation_status']}"
+                + (f" · blocked: {', '.join(code for code in flow['blocked'] if code)}" if flow["blocked"] else ""),
+                "- Skipped before any model call: " + (", ".join(
+                    f"{item['listing_id']} ({item['reason_code']})" for item in flow["skipped_candidates"]) or "none"),
+                f"- Offers: " + (", ".join(f"{o['title'] or o['listing_id']} {won(o['total_krw'])} (round {o['round']})" for o in flow["offers"]) or "none")]
+        if agreement:
+            out += [f"- Agreement `{agreement['id']}` · {agreement['status']} · total {won(agreement['total_krw'])}",
+                    f"- Snapshot hash (signed by buyer and seller, EIP-712): `{agreement['snapshot_hash']}`",
+                    f"- Buyer wallet `{agreement['buyer_wallet']}` · seller wallet `{agreement['seller_wallet']}` · signed by {flow['signed_by']}"]
+            if agreement.get("tx_hash"):
+                out.append(f"- **Tx**: [`{agreement['tx_hash']}`]({explorer}/tx/{agreement['tx_hash']}) · block {agreement['block_number']}"
+                           + (f" · RPC re-check: status {agreement['rpc_check']['status']}, {agreement['rpc_check']['logs']} log(s)" if agreement.get("rpc_check") else ""))
+        out += ["", "| # | Time (UTC) | Agent | Step | Kiln generation id | Tokens in/out | Cost (USD) | Latency | Result |",
+                "|---|---|---|---|---|---|---|---|---|"]
+        for index, call in enumerate([c for c in exported_calls if c.get("flow_id") == flow["flow_id"]], 1):
+            out.append(
+                f"| {index} | {call.get('at', '')[11:19]} | {call.get('actor')} | {STEP_LABEL.get(call.get('step'), call.get('step'))} "
+                f"| `{call.get('generation_id') or '-'}` | {call.get('input_tokens') or '-'}/{call.get('output_tokens') or '-'} "
+                f"| {f"{call['cost_usd']:.8f}" if call.get('cost_usd') is not None else '-'} | {call.get('latency_ms')}ms | {call.get('outcome')} |")
+        out.append("")
+    report_path.write_text("\n".join(out), encoding="utf-8")
+    if not args.publish:
+        report_path.chmod(0o600)
+    if args.publish:
+        # Keep the README summaries (English and Korean) in sync only after an explicit publication choice.
+        start, end = "<!-- proof:start -->", "<!-- proof:end -->"
+        summary_start = out.index("## Summary") + 2
+        summary_end = next(i for i in range(summary_start, len(out)) if out[i].startswith("## "))
+        block = "\n".join([start, "", *out[summary_start:summary_end], "Full per-call log: [docs/PROOF.md](docs/PROOF.md)", "", end])
+        for readme in (ROOT / "README.md", ROOT / "README.ko.md"):
+            text = readme.read_text(encoding="utf-8") if readme.exists() else ""
+            if start in text and end in text:
+                text = text[: text.index(start)] + block + text[text.index(end) + len(end):]
+                readme.write_text(text, encoding="utf-8")
+                print(f"updated {readme.name} proof block")
+    print(f"flows: {len(flows)} · kiln calls: {len(exported_calls)} · cost ${total_cost:.6f}")
+    print(f"wrote {report_path.relative_to(ROOT)} and {output_docs.relative_to(ROOT)}/proof/*")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

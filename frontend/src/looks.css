@@ -1,0 +1,236 @@
+/* ════════════ 시안 A · Clear — 밝고 친절한 핀테크 톤 ════════════ */
+:root {
+  --btn-primary-fg: var(--on-accent);
+  --btn-primary-shadow: none;
+  --btn-secondary-fg: var(--fg);
+  --btn-secondary-shadow: none;
+  --em-font: inherit;
+  --em-style: normal;
+  --em-weight: inherit;
+  --em-bg: none;
+  --em-clip: border-box;
+  --em2-color: var(--fg);
+  --em2-bg: none;
+  --em2-clip: border-box;
+  --how-border: 0;
+  --how-n-radius: 50%;
+  --float-bg: var(--surface);
+  --tab-active-bg: var(--surface-2);
+  --tab-active-fg: var(--fg);
+  --tab-hover: var(--surface-2);
+  --offer-active-bg: var(--surface);
+  --avatar-radius: 12px;
+  --stage-border: 0;
+  --stage-shadow: none;
+  --shadow-seg: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --seg-border: 0;
+  --card-bg: var(--surface);
+  --doc-total-bg: var(--surface-2);
+  --toast-bg: #191f28;
+  --toast-fg: #ffffff;
+  --pass-ink: var(--pass);
+  --warn-ink: var(--warn);
+  --block-ink: var(--block);
+  --seller-ink: var(--seller);
+  --font-eyebrow: var(--font);
+  --eyebrow-case: none;
+  --eyebrow-tracking: 0;
+  --card-title-weight: 700;
+  --brand-weight: 700;
+  --display-leading: 1.12;
+  --kicker-bg: var(--accent-soft);
+  --how-bg: var(--surface-2);
+  --art-bg: var(--surface-2);
+}
+
+:root:not([data-look]),
+[data-look="clear"] {
+  color-scheme: light;
+  --bg: #f2f4f6;
+  --bg-image: none;
+  --surface: #ffffff;
+  --surface-2: #f2f4f6;
+  --line: #e5e8eb;
+  --line-2: #d1d6db;
+  --fg: #191f28;
+  --fg-2: #4e5968;
+  --fg-3: #8b95a1;
+  --accent: #3182f6;
+  --accent-ink: #1b64da;
+  --accent-soft: #e8f3ff;
+  --on-accent: #ffffff;
+  --buyer: #3182f6;
+  --buyer-soft: #e8f3ff;
+  --seller: #ff8a3d;
+  --seller-ink: #e0681e;
+  --seller-soft: #fff1e6;
+  --pass: #03b26c;
+  --pass-ink: #02925a;
+  --pass-soft: #e5f8ef;
+  --warn: #ffb331;
+  --warn-ink: #c98800;
+  --warn-soft: #fff6e0;
+  --block: #f04452;
+  --block-ink: #d22030;
+  --block-soft: #ffeeee;
+  --font: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-display: var(--font);
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --display-weight: 800;
+  --display-tracking: -0.035em;
+  --num-weight: 800;
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --radius-pill: 999px;
+  --btn-radius: 16px;
+  --card-border: 0;
+  --shadow-card: 0 0 0 1px rgba(0, 27, 55, 0.045), 0 1px 2px rgba(0, 27, 55, 0.04), 0 8px 18px -12px rgba(0, 27, 55, 0.12);
+  --shadow-pop: 0 0 0 1px rgba(0, 27, 55, 0.05), 0 20px 40px -18px rgba(0, 27, 55, 0.3);
+  --skeleton: #e8ecf1;
+  --tile-radius: 24px;
+  --nav-bg: rgba(255, 255, 255, 0.88);
+  --nav-line: transparent;
+  --btn-primary-bg: #3182f6;
+  --btn-primary-shadow: 0 8px 20px -10px rgba(49, 130, 246, 0.8);
+  --btn-secondary-bg: #e8f3ff;
+  --btn-secondary-fg: #1b64da;
+  --input-bg: #f2f4f6;
+  --input-border: 1.5px solid transparent;
+  --stage-bg: radial-gradient(circle at 70% 20%, #ffffff 0%, rgba(255, 255, 255, 0) 55%), linear-gradient(160deg, #dcebff 0%, #eef5ff 50%, #f7f9fc 100%);
+  --stage-radius: 32px;
+  --em-color: #3182f6;
+  --kicker-bg: #ffffff;
+  --how-bg: #ffffff;
+  --art-bg: linear-gradient(160deg, #eef5ff, #f7f9fc);
+  --art-shadow: rgba(27, 100, 218, 0.18);
+  --brand-bg: #3182f6;
+  --brand-a: #ffffff;
+  --brand-b: #bcd8ff;
+  --brand-core: #ffffff;
+  --toast-bg: #191f28;
+}
+
+/* ════════════ 시안 D · Studio — 하드웨어 제품 같은 무광 그레이 · 오렌지 ════════════ */
+[data-look="studio"] {
+  color-scheme: light;
+  --bg: #e7e7e3;
+  --bg-image: radial-gradient(rgba(17, 17, 17, 0.11) 1px, transparent 1.3px);
+  --surface: #f6f6f3;
+  --surface-2: #e2e2de;
+  --line: rgba(17, 17, 17, 0.12);
+  --line-2: rgba(17, 17, 17, 0.32);
+  --fg: #111111;
+  --fg-2: #3f3f3c;
+  --fg-3: #75756f;
+  --accent: #ff5a1f;
+  --accent-ink: #d9430c;
+  --accent-soft: #ffe1d3;
+  --on-accent: #111111;
+  --buyer: #2458ff;
+  --buyer-soft: #dde4ff;
+  --seller: #ff5a1f;
+  --seller-ink: #cf3f08;
+  --seller-soft: #ffe1d3;
+  --pass: #1a9a52;
+  --pass-soft: #d3ecdc;
+  --warn: #d38b00;
+  --warn-ink: #a56c00;
+  --warn-soft: #f4e4bd;
+  --block: #e2311d;
+  --block-soft: #f8d7d1;
+  --font: "Pretendard", -apple-system, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Bricolage Grotesque Variable", "Pretendard", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-eyebrow: "JetBrains Mono", "Pretendard", monospace;
+  --eyebrow-case: uppercase;
+  --eyebrow-tracking: 0.04em;
+  --display-weight: 800;
+  --display-tracking: -0.04em;
+  --num-weight: 800;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+  --btn-radius: 999px;
+  --card-border: 1.5px solid #111111;
+  --shadow-card: none;
+  --shadow-pop: 5px 5px 0 #111111;
+  --shadow-seg: 0 0 0 1.5px #111111;
+  --seg-border: 1.5px solid #111111;
+  --nav-bg: rgba(231, 231, 227, 0.9);
+  --nav-line: #111111;
+  --btn-primary-bg: #111111;
+  --btn-primary-fg: #ffffff;
+  --btn-secondary-bg: #f6f6f3;
+  --btn-secondary-fg: #111111;
+  --btn-secondary-shadow: inset 0 0 0 1.5px #111111;
+  --input-bg: #ffffff;
+  --input-border: 1.5px solid #111111;
+  --stage-bg: radial-gradient(rgba(17, 17, 17, 0.12) 1px, transparent 1.3px) 0 0 / 16px 16px, #f1f1ed;
+  --stage-border: 1.5px solid #111111;
+  --stage-radius: 26px;
+  --stage-shadow: 8px 8px 0 #111111;
+  --em-color: #ff5a1f;
+  --em2-color: #111111;
+  --kicker-bg: #111111;
+  --how-bg: #f6f6f3;
+  --how-border: 1.5px solid #111111;
+  --how-n-radius: 8px;
+  --tab-active-bg: #111111;
+  --tab-active-fg: #ffffff;
+  --tab-hover: rgba(17, 17, 17, 0.08);
+  --avatar-radius: 10px;
+  --art-bg: radial-gradient(rgba(17, 17, 17, 0.1) 1px, transparent 1.3px) 0 0 / 14px 14px, #efefeb;
+  --art-shadow: rgba(17, 17, 17, 0.25);
+  --brand-bg: #ff5a1f;
+  --brand-a: #111111;
+  --brand-b: #ffffff;
+  --brand-core: #111111;
+  --toast-bg: #111111;
+  --doc-total-bg: #ffe1d3;
+  --skeleton: #dcdcd7;
+  --tile-radius: 18px;
+  --sheet-media-bg: #e7e7e3;
+  --sheet-stage-bg: #111111;
+}
+[data-look="studio"] .app { background-size: 18px 18px; }
+[data-look="studio"] .hero-kicker { color: #fff; }
+[data-look="studio"] .hero-kicker-dot { box-shadow: none; }
+[data-look="studio"] .hero-title { font-size: clamp(40px, 4.6vw, 62px); line-height: 1.06; }
+[data-look="studio"] .hero-title em.alt { text-decoration: underline; text-decoration-color: #ff5a1f; text-decoration-thickness: 0.1em; text-underline-offset: 0.08em; }
+[data-look="studio"] .eyebrow { color: var(--fg); font-size: 12.5px; }
+[data-look="studio"] .how-n { color: #111; }
+[data-look="studio"] .card-head h2, [data-look="studio"] .section-title h2, [data-look="studio"] .doc-head h2 { letter-spacing: -0.03em; }
+[data-look="studio"] .stat b:not(.muted), [data-look="studio"] .offer-foot strong, [data-look="studio"] .doc-total strong { font-family: var(--font-mono); letter-spacing: -0.04em; font-weight: 800; }
+[data-look="studio"] .btn-primary { box-shadow: 3px 3px 0 #ff5a1f; }
+[data-look="studio"] .btn-primary:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 #ff5a1f; filter: none; }
+[data-look="studio"] .listing:hover, [data-look="studio"] .offer-card:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 #111; }
+[data-look="studio"] .offer-card.is-active { box-shadow: 0 0 0 3px #ff5a1f, 6px 6px 0 #111; }
+[data-look="studio"] .offer-radio { border-color: #111; }
+[data-look="studio"] .offer-radio.on { border-color: #ff5a1f; }
+[data-look="studio"] .offer-shot { border-bottom: 1.5px solid #111; }
+[data-look="studio"] .pill { box-shadow: inset 0 0 0 1.5px currentColor; }
+[data-look="studio"] .role-chip, [data-look="studio"] .chip { box-shadow: inset 0 0 0 1.5px currentColor; }
+[data-look="studio"] .steps li { background: #fff; box-shadow: inset 0 0 0 1.5px rgba(17, 17, 17, 0.2); }
+[data-look="studio"] .msg { border: 1.5px solid #111; }
+[data-look="studio"] .lookbar { background: #111; }
+
+[data-look="studio"] .tile { border: 1.5px solid #111; box-shadow: 5px 5px 0 #111; }
+[data-look="studio"] .tile:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 #111; }
+[data-look="studio"] .tile-cap { border: 1.5px solid #111; box-shadow: 3px 3px 0 #111; }
+[data-look="studio"] .tile-badge:not(.on-dark) { box-shadow: inset 0 0 0 1.5px #111; }
+[data-look="studio"] .ev-chip { background: #fff; box-shadow: inset 0 0 0 1.5px rgba(17, 17, 17, 0.28); }
+[data-look="studio"] .ev-chip:hover { box-shadow: inset 0 0 0 1.5px #111; background: #fff; }
+[data-look="studio"] .ev-chip.tone-block { background: var(--block-soft); box-shadow: inset 0 0 0 1.5px var(--block); }
+[data-look="studio"] .offer-photos { box-shadow: inset 0 0 0 1.5px #111; }
+[data-look="studio"] .listing-art { border-bottom: 1.5px solid #111; }
+[data-look="studio"] .ev-row { background: #fff; box-shadow: inset 0 0 0 1.5px rgba(17, 17, 17, 0.16); }
+[data-look="studio"] .ev-row:hover { box-shadow: inset 0 0 0 1.5px #111; }
+[data-look="studio"] .sheet { border: 1.5px solid #111; box-shadow: 10px 10px 0 #111; }
+[data-look="studio"] .sheet-stage { border: 1.5px solid #111; }
+[data-look="studio"] .sheet-side { border-left: 1.5px solid #111; }
+[data-look="studio"] .rail-item { box-shadow: 0 0 0 1.5px rgba(17, 17, 17, 0.25); }
+[data-look="studio"] .rail-item.is-on { box-shadow: 0 0 0 2.5px #ff5a1f; }
+[data-look="studio"] .sheet-kicker, [data-look="studio"] .side-eyebrow, [data-look="studio"] .side-count { font-family: var(--font-mono); letter-spacing: 0.02em; text-transform: uppercase; }
+[data-look="studio"] .side-eyebrow { color: #111; }
+[data-look="studio"] .doc-shot { border-bottom: 1.5px solid #111; }
+[data-look="studio"] .wr, [data-look="studio"] .ocr { box-shadow: 0 0 0 1.5px #111, 4px 4px 0 #111; }
