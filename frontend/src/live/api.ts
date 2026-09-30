@@ -1,6 +1,7 @@
 import type {
   Agreement,
   AgreementSummary,
+  AuthChallenge,
   ApprovalPayload,
   Audit,
   BuyerIntent,
@@ -11,6 +12,8 @@ import type {
   ListingInput,
   Negotiation,
   NegotiationStart,
+  PublicListing,
+  Role,
 } from "./types";
 
 interface ApiProblem {
@@ -92,6 +95,14 @@ async function request<T>(
 const idPath = (id: string) => encodeURIComponent(id);
 
 export const api = {
+  createAuthChallenge: (wallet_address: string, role: Role) =>
+    request<AuthChallenge>("/auth/challenges", { method: "POST", body: { wallet_address, role } }),
+  createWalletSession: (challenge_id: string, signature: string) =>
+    request<DemoSession>("/auth/sessions", { method: "POST", body: { challenge_id, signature } }),
+  logout: (token: string) =>
+    request<{ request_id: string; revoked: boolean }>("/auth/logout", { method: "POST", token }),
+  listListings: (signal?: AbortSignal) =>
+    request<{ request_id: string; items: PublicListing[] }>("/listings", { signal }),
   createSession: (actorId: string) =>
     request<DemoSession>("/demo/sessions", { method: "POST", body: { actor_id: actorId } }),
   createBuyerIntent: (token: string, input: BuyerIntentInput) =>

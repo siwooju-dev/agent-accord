@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextvars
 import hashlib
 import json
+import os
 import re
 import threading
 import time
@@ -195,8 +196,19 @@ class KilnAgent:
             return
         line = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
         with self._log_lock:
-            self.log_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.log_path.open("a", encoding="utf-8") as handle:
+            self.log_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            descriptor = os.open(
+                self.log_path,
+                os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
+            )
+            try:
+                os.fchmod(descriptor, 0o600)
+                handle = os.fdopen(descriptor, "a", encoding="utf-8")
+            except Exception:
+                os.close(descriptor)
+                raise
+            with handle:
                 handle.write(line + "\n")
 
     def _call(self, actor: str, stage: str, messages: list[dict[str, str]]) -> tuple[str, dict[str, Any]]:

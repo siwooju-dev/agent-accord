@@ -6,9 +6,6 @@ import type {
   Offer,
 } from "../types";
 
-export const DEMO_NOTICE =
-  "데모 / mock · 가상 매물이며 실제 판매 정보가 아닙니다";
-
 export const DEMO_BUYER_INTENT: BuyerIntent = {
   id: "intent-demo-2026-091",
   gpuModel: "NVIDIA RTX 4090",

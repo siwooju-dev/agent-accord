@@ -55,6 +55,18 @@ export async function signApproval(payload: ApprovalPayload, account: Address) {
   return wallet.signTypedData({ account, ...walletTypedData(payload) });
 }
 
+export async function signLoginMessage(message: string, account: Address): Promise<`0x${string}`> {
+  const wallet = client();
+  const [current] = await wallet.getAddresses();
+  if (!current || current.toLowerCase() !== account.toLowerCase()) {
+    throw new Error("서명 직전에 지갑 계정이 바뀌었습니다.");
+  }
+  if (await wallet.getChainId() !== baseSepolia.id) {
+    throw new Error("로그인 서명 전에 Base Sepolia로 전환해 주세요.");
+  }
+  return wallet.signMessage({ account, message });
+}
+
 export function watchWallet(onChange: () => void): () => void {
   const provider = window.ethereum as (typeof window.ethereum & {
     on?: (event: string, listener: () => void) => void;

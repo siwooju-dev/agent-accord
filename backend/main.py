@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import secrets
+from collections import deque
 from datetime import datetime, timedelta, timezone
+from threading import Lock
+from time import monotonic
 from typing import Any
+from urllib.parse import urlsplit
 
+from eth_account import Account
+from eth_account.messages import encode_defunct
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,8 +26,9 @@ from .config import Settings
 from .models import (
     AgreementView, ApprovalPayloadView, AuditView, BuyerIntentInput,
     BuyerIntentView, ChainView, DecisionInput, DecisionView, DemoSessionInput, DemoSessionView,
-    ErrorView, HealthView, ListingInput, ListingView, NegotiationInput, NegotiationStartView,
-    NegotiationView,
+    ErrorView, HealthView, ListingCatalogView, ListingInput, ListingView, NegotiationInput,
+    NegotiationStartView, NegotiationView, WalletAuthChallengeInput,
+    WalletAuthChallengeView, WalletAuthSessionInput, WalletAuthSessionView,
 )
 from .policy import evaluate_offer
 from .store import Store, evidence_hash, new_id, parse_time, utc_now, utc_stamp
@@ -57,6 +65,12 @@ ERROR_MESSAGES = {
     "OFFER_EXPIRED": "합의안 승인 기한이 지났습니다.",
     "DEMO_SESSIONS_DISABLED": "이 환경에서는 데모 세션을 사용할 수 없습니다.",
     "EVIDENCE_NOT_OWNED": "이 판매자 계정에 등록된 데모 증빙 ID가 아닙니다.",
+    "AUTH_ORIGIN_INVALID": "요청한 사이트 주소를 확인할 수 없습니다.",
+    "AUTH_CHALLENGE_INVALID": "로그인 요청이 만료되었거나 이미 사용되었습니다. 다시 시도하세요.",
+    "AUTH_SIGNATURE_INVALID": "연결된 지갑의 서명이 일치하지 않습니다.",
+    "AUTH_WALLET_NOT_ALLOWED": "이 데모에 등록된 지갑이 아닙니다.",
+    "AUTH_RATE_LIMITED": "로그인 요청이 많습니다. 잠시 후 다시 시도하세요.",
+    "NEGOTIATION_RATE_LIMITED": "협상 요청 한도에 도달했습니다. 잠시 후 다시 시도하세요.",
 }
 
 
@@ -104,8 +118,13 @@ AUDIT_EVENT_PUBLIC_FIELDS = (
 )
 
 
-def _public_audit_event(event: dict[str, Any]) -> dict[str, Any]:
-    return {key: event[key] for key in AUDIT_EVENT_PUBLIC_FIELDS}
+def _public_audit_event(event: dict[str, Any], *, redact_private_policy: bool = False) -> dict[str, Any]:
+    result = {key: event[key] for key in AUDIT_EVENT_PUBLIC_FIELDS}
+    if (redact_private_policy and result["event_type"] == "CANDIDATE_BLOCKED"
+            and result["reason_code"] == "BUDGET_EXCEEDED"):
+        result["object_id"] = None
+        result["reason_code"] = "CANDIDATE_UNAVAILABLE"
+    return result
 
 
 def _chain_view(value: dict[str, Any] | None) -> dict[str, Any]:
@@ -113,6 +132,29 @@ def _chain_view(value: dict[str, Any] | None) -> dict[str, Any]:
         "mode": None, "chain_id": None, "tx_hash": None, "receipt_status": None,
         "block_number": None, "event_name": None, "recorded_hash": None, "reason_code": None,
     }
+
+
+def _record_matches_agreement(
+    result: dict[str, Any], agreement: dict[str, Any], chain_id: int,
+) -> bool:
+    snapshot = agreement["snapshot"]
+    chain = agreement.get("chain") or {}
+    return (
+        result.get("status") == "success"
+        and type(result.get("chain_id")) is int and result["chain_id"] == chain_id
+        and isinstance(result.get("tx_hash"), str)
+        and result["tx_hash"].lower() == str(chain.get("tx_hash", "")).lower()
+        and isinstance(result.get("agreement_hash"), str)
+        and result["agreement_hash"].lower() == agreement["snapshot_hash"].lower()
+        and isinstance(result.get("buyer"), str)
+        and result["buyer"].lower() == snapshot["buyer_wallet"].lower()
+        and isinstance(result.get("seller"), str)
+        and result["seller"].lower() == snapshot["seller_wallet"].lower()
+        and type(result.get("total_krw")) is int
+        and result["total_krw"] == snapshot["total_krw"]
+        and type(result.get("nonce")) is int
+        and result["nonce"] == snapshot["nonce"]
+    )
 
 
 def create_app(settings: Settings | None = None, *, database_path: str | None = None) -> FastAPI:
@@ -123,11 +165,64 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
     store = Store(settings.database_path)
     store.seed_demo_listings(settings.actors)
 
-    app = FastAPI(title="Agent Accord API", version="0.1.0")
+    app = FastAPI(title="Agent Accord API", version="0.2.0")
     app.state.settings = settings
     app.state.store = store
     app.state.agent = MockAgent() if settings.mode == "mock" else KilnAgent(settings)
     app.state.chain = None
+    auth_requests: dict[tuple[str, str], deque[float]] = {}
+    auth_lock = Lock()
+
+    def auth_origin(request: Request) -> tuple[str, str]:
+        origin = request.headers.get("origin", "")
+        host = request.headers.get("host", "")
+        parsed = urlsplit(origin)
+        hostname = (parsed.hostname or "").lower()
+        local_hosts = {"localhost", "127.0.0.1", "::1"}
+        if (parsed.scheme not in {"http", "https"} or not parsed.netloc
+                or parsed.path not in {"", "/"} or parsed.query or parsed.fragment
+                or parsed.username or parsed.password or parsed.netloc.lower() != host.lower()
+                or (parsed.scheme != "https" and hostname not in local_hosts)):
+            raise ApiError("AUTH_ORIGIN_INVALID", 403)
+        return parsed.scheme, parsed.netloc
+
+    def rate_limit_auth(endpoint: str, request: Request) -> None:
+        now = monotonic()
+        remote_host = request.client.host if request.client else "unknown"
+        client_key = remote_host.lower()
+        try:
+            remote_address = ipaddress.ip_address(remote_host)
+        except ValueError:
+            remote_address = None
+        forwarded_client = request.headers.get("x-accord-client-ip", "").strip()
+        if remote_address is not None and remote_address.is_loopback and forwarded_client:
+            try:
+                client_key = str(ipaddress.ip_address(forwarded_client))
+            except ValueError:
+                pass
+        key = (endpoint, client_key)
+        with auth_lock:
+            for old_key, old_bucket in list(auth_requests.items()):
+                while old_bucket and old_bucket[0] <= now - 60:
+                    old_bucket.popleft()
+                if not old_bucket:
+                    del auth_requests[old_key]
+            if key not in auth_requests and len(auth_requests) >= 2048:
+                raise ApiError("AUTH_RATE_LIMITED", 429)
+            bucket = auth_requests.setdefault(key, deque())
+            if len(bucket) >= 20:
+                raise ApiError("AUTH_RATE_LIMITED", 429)
+            bucket.append(now)
+
+    def wallet_actor_id(role: str, wallet_address: str) -> str:
+        normalized = wallet_address.lower()
+        for actor_id, profile in settings.actors.items():
+            if profile["role"] == role and profile["wallet_address"].lower() == normalized:
+                return actor_id
+        if settings.mode == "live":
+            raise ApiError("AUTH_WALLET_NOT_ALLOWED", 403)
+        digest = hashlib.sha256(f"{role}:{normalized}".encode("utf-8")).hexdigest()[:32]
+        return f"wallet-{role}-{digest}"
 
     app.add_middleware(
         CORSMiddleware,
@@ -188,13 +283,22 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
         if not session or parse_time(session["expires_at"]) <= utc_now():
             raise ApiError("SESSION_REQUIRED", 401)
         actor = settings.actors.get(session["actor_id"])
-        if not actor:
+        role = session.get("role") or (actor or {}).get("role")
+        wallet_address = session.get("wallet_address") or (actor or {}).get("wallet_address")
+        if role not in {"buyer", "seller"} or not wallet_address:
             raise ApiError("SESSION_REQUIRED", 401)
         return {
             "actor_id": session["actor_id"],
-            "role": actor["role"],
-            "wallet_address": actor["wallet_address"].lower(),
+            "role": role,
+            "wallet_address": wallet_address.lower(),
         }
+
+    @app.post("/api/auth/logout")
+    def logout(request: Request, _actor=Depends(current_actor)):
+        # Verify the bearer token first; only its hash is stored or deleted.
+        token = request.headers["authorization"][7:].strip()
+        revoked = store.delete_session(_hash_token(token))
+        return {"request_id": request.state.request_id, "revoked": revoked}
 
     def require_role(actor: dict[str, Any], role: str) -> None:
         if actor["role"] != role:
@@ -204,7 +308,11 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
         agreement = store.get("agreement", agreement_id)
         if not agreement:
             raise ApiError("AGREEMENT_NOT_FOUND", 404)
-        if actor["actor_id"] not in {agreement["buyer_id"], agreement["seller_id"]}:
+        wallet = actor["wallet_address"].lower()
+        snapshot = agreement["snapshot"]
+        is_buyer = actor["role"] == "buyer" and wallet == snapshot["buyer_wallet"].lower()
+        is_seller = actor["role"] == "seller" and wallet == snapshot["seller_wallet"].lower()
+        if not (is_buyer or is_seller):
             raise ApiError("ROLE_FORBIDDEN", 403)
         return agreement
 
@@ -269,6 +377,8 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
             result = client.get_record(tx_hash, agreement["snapshot_hash"])
             updated = dict(agreement)
             if result["status"] == "success":
+                if not _record_matches_agreement(result, agreement, settings.chain_id):
+                    return agreement
                 updated["status"] = "RECORDED"
                 updated["chain"] = {
                     "mode": "testnet", "chain_id": result["chain_id"], "tx_hash": result["tx_hash"],
@@ -331,6 +441,8 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
             if not current:
                 return
             if result["status"] == "success":
+                if not _record_matches_agreement(result, current, settings.chain_id):
+                    raise ChainError("record does not match the approved agreement")
                 current["status"] = "RECORDED"
                 current["chain"] = {
                     "mode": "testnet", "chain_id": result["chain_id"], "tx_hash": result["tx_hash"],
@@ -388,7 +500,9 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
         # One candidate per seller: a seller's newest listing for this model replaces older ones.
         latest_by_seller: dict[str, dict[str, Any]] = {}
         for item in store.list("listing"):
-            if item["gpu_model"].casefold() == intent["gpu_model"].casefold():
+            if (item["gpu_model"].casefold() == intent["gpu_model"].casefold()
+                    and item.get("stock_status") == "available"
+                    and item.get("seller_wallet", "").lower() != intent.get("buyer_wallet", "").lower()):
                 latest_by_seller[item["seller_id"]] = item
         listings = list(latest_by_seller.values())[:3]
         assessments: list[dict[str, Any]] = []
@@ -474,9 +588,6 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                     continue
                 final_price = seller_reply["item_price_krw"]
                 final_delivery = buyer_offer["delivery_by"]
-                reasons = [f"구매 에이전트: {buyer_offer['reason']}"] if buyer_offer.get("reason") else []
-                if seller_reply.get("reason"):
-                    reasons.append(f"판매 에이전트: {seller_reply['reason']}")
                 offer_round = 1
                 if seller_reply["action"] == "counter":
                     buyer_reply, buyer_reply_usage = app.state.agent.buyer_reply(
@@ -493,8 +604,6 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                         continue
                     offer_round = 2
                     final_delivery = seller_reply.get("delivery_by") or buyer_offer["delivery_by"]
-                    if buyer_reply.get("reason"):
-                        reasons.append(f"구매 에이전트 답: {buyer_reply['reason']}")
                 decision = evaluate_offer(
                     intent, listing, item_price_krw=final_price,
                     delivery_by=_datetime_string(final_delivery), now=now,
@@ -521,11 +630,11 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                     "warranty_terms": buyer_offer["warranty_terms"],
                     "expires_at": utc_stamp(now + timedelta(hours=12)),
                     "evidence_ids": list(listing["evidence_ids"]),
-                    "rationale": " ".join([(
+                    "rationale": (
                         "판매자 제안을 구매자 조건과 대조해 서버 검사를 통과했습니다."
                         if offer_round == 2 else
                         "판매자가 구매자 제안을 수락했고 구매 조건에 대한 서버 검사를 통과했습니다."
-                    ), *reasons])[:900],
+                    ),
                     "valid": True,
                     "assessment": assessments[-1],
                     "seller_id": listing["seller_id"],
@@ -558,11 +667,11 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
         chosen = min(offers, key=lambda item: (item["total_krw"], item["id"])) if offers else None
         if chosen:
             agreement_id = new_id("agreement")
-            buyer_actor = settings.actors[intent["buyer_id"]]
-            seller_actor = settings.actors[chosen["seller_id"]]
+            buyer_wallet = intent.get("buyer_wallet") or settings.actors[intent["buyer_id"]]["wallet_address"]
+            seller_wallet = chosen["seller_wallet"]
             expiry = min(now + timedelta(hours=12), parse_time(intent["delivery_deadline"]))
             with store.transaction() as conn:
-                nonce = store.allocate_nonce(buyer_actor["wallet_address"], agreement_id, conn)
+                nonce = store.allocate_nonce(buyer_wallet, agreement_id, conn)
                 snapshot = {
                     "snapshot_version": 1,
                     "agreement_id": agreement_id,
@@ -576,8 +685,8 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                     "delivery_by": chosen["delivery_by"],
                     "warranty_terms": chosen["warranty_terms"],
                     "evidence_hashes": chosen["evidence_hashes"],
-                    "buyer_wallet": buyer_actor["wallet_address"].lower(),
-                    "seller_wallet": seller_actor["wallet_address"].lower(),
+                    "buyer_wallet": buyer_wallet.lower(),
+                    "seller_wallet": seller_wallet.lower(),
                     "expires_at": utc_stamp(expiry),
                     "nonce": nonce,
                 }
@@ -644,11 +753,84 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
             except Exception:
                 relayer = "invalid"
         return {
-            "status": "ok", "contract_version": "0.1", "mode": settings.mode, "chain_mode": settings.chain_mode,
+            "status": "ok", "contract_version": "0.2", "mode": settings.mode, "chain_mode": settings.chain_mode,
             "kiln": {"agent": "kiln" if settings.mode == "live" else "mock", "model_id": settings.kiln_model_id,
-                     "base_url": settings.kiln_base_url, "api_key_configured": bool(settings.kiln_api_key)},
+                     "api_key_configured": bool(settings.kiln_api_key)},
             "chain": {"chain_id": settings.chain_id, "contract_address": settings.contract_address or None,
                       "relayer_address": relayer, "explorer_url": settings.chain_explorer_url},
+        }
+
+    @app.post("/api/auth/challenges", response_model=WalletAuthChallengeView, status_code=201)
+    def create_wallet_challenge(body: WalletAuthChallengeInput, request: Request):
+        scheme, domain = auth_origin(request)
+        if not Web3.is_address(body.wallet_address):
+            raise ApiError("VALIDATION_ERROR", 422)
+        wallet_address = Web3.to_checksum_address(body.wallet_address)
+        wallet_actor_id(body.role, wallet_address)
+        rate_limit_auth("challenge", request)
+        origin = f"{scheme}://{domain}"
+        issued = utc_now()
+        expires = issued + timedelta(minutes=5)
+        nonce = secrets.token_hex(16)
+        role_label = "buyer" if body.role == "buyer" else "seller"
+        message = (
+            f"{scheme}://{domain} wants you to sign in with your Ethereum account:\n"
+            f"{wallet_address}\n\n"
+            f"Sign in to Accord as a {role_label}. This signature does not approve a purchase or submit a transaction.\n\n"
+            f"URI: {origin}/\n"
+            f"Version: 1\n"
+            f"Chain ID: {settings.chain_id}\n"
+            f"Nonce: {nonce}\n"
+            f"Issued At: {utc_stamp(issued)}\n"
+            f"Expiration Time: {utc_stamp(expires)}"
+        )
+        challenge_id = new_id("challenge")
+        expires_at = utc_stamp(expires)
+        store.create_auth_challenge(
+            challenge_id, wallet_address, body.role, origin, message, nonce,
+            utc_stamp(issued), expires_at,
+        )
+        return {
+            "request_id": request.state.request_id,
+            "challenge_id": challenge_id,
+            "message": message,
+            "expires_at": expires_at,
+        }
+
+    @app.post("/api/auth/sessions", response_model=WalletAuthSessionView)
+    def create_wallet_session(body: WalletAuthSessionInput, request: Request):
+        scheme, domain = auth_origin(request)
+        origin = f"{scheme}://{domain}"
+        challenge = store.get_auth_challenge(body.challenge_id)
+        now = utc_now()
+        if (challenge is None or challenge["origin"] != origin
+                or parse_time(str(challenge["expires_at"])) <= now
+                or challenge["consumed_at"] is not None):
+            raise ApiError("AUTH_CHALLENGE_INVALID", 401)
+        wallet_address = str(challenge["wallet_address"])
+        role = str(challenge["role"])
+        wallet_actor_id(role, wallet_address)
+        rate_limit_auth("session", request)
+        try:
+            recovered = Account.recover_message(
+                encode_defunct(text=str(challenge["message"])), signature=body.signature,
+            )
+        except Exception as exc:
+            raise ApiError("AUTH_SIGNATURE_INVALID", 401) from exc
+        if recovered.lower() != wallet_address.lower():
+            raise ApiError("AUTH_SIGNATURE_INVALID", 401)
+
+        actor_id = wallet_actor_id(role, wallet_address)
+        token = secrets.token_urlsafe(32)
+        expiry = utc_stamp(now + timedelta(seconds=settings.session_seconds))
+        if not store.consume_auth_challenge_and_create_session(
+            challenge_id=body.challenge_id, now=utc_stamp(now), token_hash=_hash_token(token),
+            actor_id=actor_id, role=role, wallet_address=wallet_address, session_expires_at=expiry,
+        ):
+            raise ApiError("AUTH_CHALLENGE_INVALID", 401)
+        return {
+            "request_id": request.state.request_id, "access_token": token,
+            "actor_id": actor_id, "role": role, "wallet_address": wallet_address.lower(),
         }
 
     @app.post("/api/demo/sessions", response_model=DemoSessionView)
@@ -660,7 +842,7 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
             raise ApiError("SESSION_REQUIRED", 401)
         token = secrets.token_urlsafe(32)
         expiry = utc_stamp(utc_now() + timedelta(seconds=settings.session_seconds))
-        store.create_session(_hash_token(token), body.actor_id, expiry)
+        store.create_session(_hash_token(token), body.actor_id, expiry, profile["role"], profile["wallet_address"])
         return {
             "request_id": request.state.request_id, "access_token": token,
             "actor_id": body.actor_id, "role": profile["role"],
@@ -675,6 +857,7 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
         intent_id = new_id("intent")
         payload = {
             "buyer_id": actor["actor_id"],
+            "buyer_wallet": actor["wallet_address"].lower(),
             "gpu_model": body.gpu_model,
             "max_total_krw": body.max_total_krw,
             "delivery_deadline": utc_stamp(body.delivery_deadline),
@@ -685,13 +868,37 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
         return {"request_id": request.state.request_id, "id": intent_id,
                 "buyer_id": actor["actor_id"], **payload}
 
+    @app.get("/api/listings", response_model=ListingCatalogView)
+    def list_public_listings(request: Request):
+        items = []
+        for listing in store.list("listing"):
+            private = listing.get("private_policy") or {}
+            items.append({
+                "id": listing["id"],
+                "seller_id": listing["seller_id"],
+                "title": listing.get("title") or listing["gpu_model"],
+                "gpu_model": listing["gpu_model"],
+                "asking_price_krw": listing["asking_price_krw"],
+                "shipping_fee_krw": listing["shipping_fee_krw"],
+                "condition_text": listing["condition_text"],
+                "warranty_end": listing.get("warranty_end"),
+                "stock_status": listing["stock_status"],
+                "earliest_delivery_at": private.get("earliest_delivery_at", ""),
+                "evidence": [
+                    {key: evidence[key] for key in ("id", "kind", "label", "summary") if key in evidence}
+                    for evidence in listing.get("evidence", [])
+                ],
+                "source": "demo" if listing.get("source") == "demo" else "seller_claimed",
+            })
+        return {"request_id": request.state.request_id, "items": items}
+
     @app.post("/api/listings", status_code=201, response_model=ListingView)
     def create_listing(body: ListingInput, request: Request, actor=Depends(current_actor)):
         require_role(actor, "seller")
         owned_evidence_ids = {
             evidence_id
             for existing in store.list("listing")
-            if existing["seller_id"] == actor["actor_id"]
+            if existing.get("seller_wallet", "").lower() == actor["wallet_address"].lower()
             for evidence_id in existing["evidence_ids"]
         }
         if not set(body.evidence_ids).issubset(owned_evidence_ids):
@@ -700,7 +907,7 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
         known_evidence = {
             item["id"]: item
             for existing in store.list("listing")
-            if existing["seller_id"] == actor["actor_id"]
+            if existing.get("seller_wallet", "").lower() == actor["wallet_address"].lower()
             for item in existing.get("evidence", [])
         }
         evidence = [known_evidence[evidence_id] for evidence_id in body.evidence_ids if evidence_id in known_evidence]
@@ -757,6 +964,11 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                     "flow_id": existing["flow_id"], "status": existing["status"],
                     "agreement_id": existing.get("agreement_id"),
                 }
+            if (settings.mode == "live" and store.count_recent_owned(
+                    "negotiation", actor["actor_id"],
+                    utc_stamp(utc_now() - timedelta(hours=1)), conn,
+            ) >= 3):
+                raise ApiError("NEGOTIATION_RATE_LIMITED", 429)
             negotiation_id, flow_id = new_id("neg"), new_id("flow")
             negotiation = {
                 "flow_id": flow_id, "buyer_id": actor["actor_id"],
@@ -787,7 +999,11 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
             "flow_id": negotiation["flow_id"], "status": negotiation["status"],
             "assessments": negotiation["assessments"],
             "offers": [_public_offer(item) for item in negotiation["offers"]],
-            "blocked_events": negotiation["blocked_events"],
+            "blocked_events": [
+                {**event, "reason_code": "CANDIDATE_UNAVAILABLE"}
+                if event.get("reason_code") == "BUDGET_EXCEEDED" else event
+                for event in negotiation["blocked_events"]
+            ],
             "selected_offer_id": negotiation["selected_offer_id"],
             "agreement_id": negotiation["agreement_id"],
         }
@@ -806,8 +1022,10 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
         agreements = []
         for agreement in store.list("agreement"):
             permitted = (
-                actor["actor_id"] == agreement["buyer_id"]
-                or (actor["role"] == "seller" and actor["actor_id"] == agreement["seller_id"])
+                (actor["role"] == "buyer"
+                 and actor["wallet_address"].lower() == agreement["snapshot"]["buyer_wallet"].lower())
+                or (actor["role"] == "seller"
+                    and actor["wallet_address"].lower() == agreement["snapshot"]["seller_wallet"].lower())
             )
             if not permitted or (status and agreement["status"] != status):
                 continue
@@ -944,7 +1162,8 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
             raise ApiError("REQUEST_NOT_FOUND", 404)
         if actor["actor_id"] != negotiation["buyer_id"]:
             agreement = store.get("agreement", negotiation.get("agreement_id", "")) if negotiation.get("agreement_id") else None
-            if not agreement or actor["actor_id"] != agreement["seller_id"] or actor["role"] != "seller":
+            seller_wallet = (agreement or {}).get("snapshot", {}).get("seller_wallet", "").lower()
+            if not agreement or actor["role"] != "seller" or actor["wallet_address"] != seller_wallet:
                 raise ApiError("ROLE_FORBIDDEN", 403)
         agreement = store.get("agreement", negotiation.get("agreement_id", "")) if negotiation.get("agreement_id") else None
         usage = store.usages(flow_id)
@@ -954,7 +1173,8 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
             "request_id": request.state.request_id,
             "flow_id": flow_id,
             "status": negotiation["status"] if not agreement else agreement["status"],
-            "events": [_public_audit_event(event) for event in store.events(flow_id)],
+            "events": [_public_audit_event(event, redact_private_policy=actor["role"] == "buyer")
+                       for event in store.events(flow_id)],
             "model_usage": usage,
             "totals": {
                 "calls": len(usage),

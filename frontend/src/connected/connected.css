@@ -1,0 +1,61 @@
+/* Additions for the connected (live API) app. Tokens come from looks.css. */
+.wallet-chip { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 4px 0 12px; border-radius: var(--radius-pill); background: var(--surface-2); font-size: 13px; }
+.wallet-chip b { font-weight: 700; margin-right: 6px; }
+.wallet-chip small { color: var(--fg-2); }
+.wallet-chip button { height: 26px; padding: 0 10px; border: 0; border-radius: var(--radius-pill); background: var(--surface); color: var(--fg-2); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.wallet-chip button:hover { color: var(--fg); }
+.wallet-chip .dot, .login-switch .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.wallet-chip .dot.buyer, .login-switch .dot.buyer { background: var(--buyer); }
+.wallet-chip .dot.seller, .login-switch .dot.seller { background: var(--seller); }
+.login-switch button { white-space: nowrap; }
+
+.status-strip { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 9px 16px; background: var(--accent-soft); color: var(--fg); font-size: 13.5px; font-weight: 600; }
+.status-strip.is-error { background: var(--block-soft); color: var(--block-ink, var(--block)); }
+.status-strip button { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 2px; }
+
+.spinner { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 25%, transparent); border-top-color: currentColor; animation: accord-spin 0.8s linear infinite; }
+.spinner.big { width: 26px; height: 26px; border-width: 3px; color: var(--accent, var(--buyer)); }
+@keyframes accord-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+
+.login-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18px; padding: 24px 28px; }
+.login-card h2 { margin: 0 0 4px; font-size: 18px; }
+.login-card p { margin: 0; color: var(--fg-2); }
+.login-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 760px) { .login-card { grid-template-columns: 1fr; } }
+
+.listing-cover.placeholder { display: grid; place-items: center; align-content: center; gap: 8px; aspect-ratio: 16 / 10; width: 100%; background: var(--surface-2); color: var(--fg-3, var(--fg-2)); }
+.listing-cover.placeholder b { font-size: 14px; color: var(--fg-2); }
+.mine-tag { margin-left: 8px; padding: 1px 7px; border-radius: var(--radius-pill); background: var(--seller-soft); color: var(--seller-ink, var(--seller)); font-size: 11px; font-weight: 700; }
+
+.pending-list { display: grid; gap: 8px; }
+.pending-row { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-md, 12px); background: var(--surface); color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.pending-row:hover { border-color: var(--fg-3, var(--line)); }
+.pending-row span { display: grid; gap: 2px; min-width: 0; }
+.pending-row small { color: var(--fg-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.pending-row strong { font-variant-numeric: tabular-nums; }
+
+.presets { margin-bottom: 14px; flex-wrap: wrap; }
+.check-inline { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 14px; }
+.check-inline small { margin-left: 4px; }
+.muted { color: var(--fg-2); }
+.form-foot { gap: 12px; }
+
+.live-status.is-running { background: var(--accent-soft); }
+.finding.conflicted b { color: var(--block); }
+.finding.consistent b { color: var(--pass); }
+.finding.unverified b { color: var(--fg-2); }
+.finding b { margin-right: 4px; }
+
+.usage-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; max-height: 260px; overflow: auto; }
+.usage-list.tall { max-height: 420px; }
+.usage-list li { display: grid; grid-template-columns: 1.3fr 1fr auto auto auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); font-size: 12.5px; }
+.usage-list.tall li { grid-template-columns: 1.4fr 1fr auto auto; }
+.usage-list li.warn { background: var(--warn-soft, var(--surface-2)); }
+.usage-list b { font-weight: 700; }
+.result-box { display: grid; gap: 6px; justify-items: start; margin-bottom: 12px; }
+.result-box strong { font-size: 28px; font-variant-numeric: tabular-nums; }
+.reason-list { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; color: var(--fg-2); font-size: 13px; }
+.reason-list li { display: flex; align-items: center; gap: 6px; }
+.ev-row.static { cursor: default; }
+.connected .kv a { color: inherit; }

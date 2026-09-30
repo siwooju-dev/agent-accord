@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -30,7 +31,16 @@ def parse_time(value: str) -> datetime:
 class Store:
     def __init__(self, database_path: str):
         self.path = Path(database_path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        descriptor = os.open(
+            self.path,
+            os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+        try:
+            os.fchmod(descriptor, 0o600)
+        finally:
+            os.close(descriptor)
         self.initialize()
 
     def connect(self) -> sqlite3.Connection:
@@ -59,8 +69,22 @@ class Store:
                 CREATE TABLE IF NOT EXISTS sessions (
                     token_hash TEXT PRIMARY KEY,
                     actor_id TEXT NOT NULL,
+                    role TEXT,
+                    wallet_address TEXT,
                     expires_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS auth_challenges (
+                    challenge_id TEXT PRIMARY KEY,
+                    wallet_address TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    origin TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    nonce TEXT NOT NULL,
+                    issued_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    consumed_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_auth_challenges_expiry ON auth_challenges(expires_at);
                 CREATE TABLE IF NOT EXISTS idempotency (
                     actor_id TEXT NOT NULL,
                     operation TEXT NOT NULL,
@@ -96,6 +120,11 @@ class Store:
                 );
                 """
             )
+            session_columns = {row["name"] for row in conn.execute("PRAGMA table_info(sessions)")}
+            if "role" not in session_columns:
+                conn.execute("ALTER TABLE sessions ADD COLUMN role TEXT")
+            if "wallet_address" not in session_columns:
+                conn.execute("ALTER TABLE sessions ADD COLUMN wallet_address TEXT")
         finally:
             conn.close()
 
@@ -149,6 +178,15 @@ class Store:
         with self.read() as db:
             return self.list(kind, db)
 
+    def count_recent_owned(
+        self, kind: str, owner_id: str, since: str, conn: sqlite3.Connection,
+    ) -> int:
+        row = conn.execute(
+            "SELECT COUNT(*) AS count FROM entities WHERE kind=? AND owner_id=? AND created_at>=?",
+            (kind, owner_id, since),
+        ).fetchone()
+        return int(row["count"])
+
     def put(
         self,
         kind: str,
@@ -170,19 +208,79 @@ class Store:
             (kind, entity_id, owner_id, self.encode(payload), now, now),
         )
 
-    def create_session(self, token_hash: str, actor_id: str, expires_at: str) -> None:
+    def create_session(
+        self, token_hash: str, actor_id: str, expires_at: str,
+        role: str | None = None, wallet_address: str | None = None,
+    ) -> None:
         with self.transaction() as conn:
             conn.execute(
-                "INSERT INTO sessions(token_hash,actor_id,expires_at) VALUES(?,?,?)",
-                (token_hash, actor_id, expires_at),
+                "INSERT INTO sessions(token_hash,actor_id,role,wallet_address,expires_at) VALUES(?,?,?,?,?)",
+                (token_hash, actor_id, role, wallet_address.lower() if wallet_address else None, expires_at),
             )
 
     def get_session(self, token_hash: str) -> dict[str, str] | None:
         with self.read() as conn:
             row = conn.execute(
-                "SELECT actor_id,expires_at FROM sessions WHERE token_hash=?", (token_hash,)
+                "SELECT actor_id,role,wallet_address,expires_at FROM sessions WHERE token_hash=?", (token_hash,)
             ).fetchone()
-            return None if row is None else {"actor_id": row["actor_id"], "expires_at": row["expires_at"]}
+            return None if row is None else {
+                "actor_id": row["actor_id"], "role": row["role"],
+                "wallet_address": row["wallet_address"], "expires_at": row["expires_at"],
+            }
+
+    def delete_session(self, token_hash: str) -> bool:
+        with self.transaction() as conn:
+            cursor = conn.execute("DELETE FROM sessions WHERE token_hash=?", (token_hash,))
+            return cursor.rowcount == 1
+
+    def create_auth_challenge(
+        self, challenge_id: str, wallet_address: str, role: str, origin: str,
+        message: str, nonce: str, issued_at: str, expires_at: str,
+    ) -> None:
+        with self.transaction() as conn:
+            conn.execute(
+                "DELETE FROM auth_challenges WHERE expires_at<=? OR consumed_at IS NOT NULL",
+                (issued_at,),
+            )
+            conn.execute(
+                """INSERT INTO auth_challenges(
+                    challenge_id,wallet_address,role,origin,message,nonce,issued_at,expires_at
+                ) VALUES(?,?,?,?,?,?,?,?)""",
+                (challenge_id, wallet_address.lower(), role, origin, message, nonce, issued_at, expires_at),
+            )
+
+    def get_auth_challenge(self, challenge_id: str) -> dict[str, str | None] | None:
+        with self.read() as conn:
+            row = conn.execute(
+                """SELECT challenge_id,wallet_address,role,origin,message,nonce,issued_at,expires_at,consumed_at
+                   FROM auth_challenges WHERE challenge_id=?""",
+                (challenge_id,),
+            ).fetchone()
+            return None if row is None else dict(row)
+
+    def consume_auth_challenge_and_create_session(
+        self, *, challenge_id: str, now: str, token_hash: str, actor_id: str,
+        role: str, wallet_address: str, session_expires_at: str,
+    ) -> bool:
+        with self.transaction() as conn:
+            row = conn.execute(
+                "SELECT expires_at,consumed_at,role,wallet_address FROM auth_challenges WHERE challenge_id=?",
+                (challenge_id,),
+            ).fetchone()
+            if (row is None or row["consumed_at"] is not None or row["expires_at"] <= now
+                    or row["role"] != role or row["wallet_address"].lower() != wallet_address.lower()):
+                return False
+            updated = conn.execute(
+                "UPDATE auth_challenges SET consumed_at=? WHERE challenge_id=? AND consumed_at IS NULL AND expires_at>?",
+                (now, challenge_id, now),
+            )
+            if updated.rowcount != 1:
+                return False
+            conn.execute(
+                "INSERT INTO sessions(token_hash,actor_id,role,wallet_address,expires_at) VALUES(?,?,?,?,?)",
+                (token_hash, actor_id, role, wallet_address.lower(), session_expires_at),
+            )
+            return True
 
     def idempotency(
         self, actor_id: str, operation: str, key: str, body_hash: str, conn: sqlite3.Connection
@@ -264,10 +362,9 @@ class Store:
     def seed_demo_listings(self, actors: dict[str, dict[str, str]]) -> None:
         """Three demo RTX 4090 listings that mirror the frontend demo. All data is fictional."""
         with self.transaction() as conn:
-            row = conn.execute("SELECT COUNT(*) AS count FROM entities WHERE kind='listing'").fetchone()
-            if int(row["count"]) != 0:
-                return
             for fixture in DEMO_LISTINGS:
+                if self.get("listing", fixture["listing_id"], conn) is not None:
+                    continue
                 actor = actors.get(fixture["seller_id"])
                 if not actor or actor.get("role") != "seller":
                     continue
@@ -289,7 +386,7 @@ class Store:
                         "min_item_price_krw": fixture["floor"],
                         "earliest_delivery_at": utc_stamp(utc_now() + timedelta(days=fixture["ships_in_days"])),
                     },
-                    "source": "demo/mock",
+                    "source": "demo",
                 }
                 self.put("listing", fixture["listing_id"], fixture["seller_id"], payload, conn)
 

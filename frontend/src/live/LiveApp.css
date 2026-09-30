@@ -110,6 +110,36 @@
 .live-audit li { display: grid; grid-template-columns: 170px 190px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .live-audit time { color: var(--fg-3); }
 .live-card a { color: var(--accent-ink); }
+.live-chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: var(--radius-pill); background: var(--surface-2); color: var(--fg-2); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.live-chip::before { width: 8px; height: 8px; border-radius: 50%; background: currentColor; content: ""; }
+.live-chip.ok { background: var(--pass-soft); color: var(--pass-ink, var(--pass)); }
+.live-chip.error { background: var(--block-soft); color: var(--block); }
+.live-chip.pending { background: var(--warn-soft); color: var(--warn-ink, var(--warn)); }
+.live-intro > small { display: inline-block; margin-top: 6px; color: var(--fg-3); }
+.live-catalog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap: 14px; }
+.live-listing { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+.live-listing-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.live-listing-tag, .live-stock { display: inline-flex; align-items: center; min-height: 25px; padding: 3px 9px; border-radius: var(--radius-pill); font-size: 11.5px; font-weight: 700; }
+.live-listing-tag.demo { background: var(--accent-soft); color: var(--accent-ink); }
+.live-listing-tag.seller { background: var(--pass-soft); color: var(--pass-ink, var(--pass)); }
+.live-stock { background: var(--pass-soft); color: var(--pass-ink, var(--pass)); }
+.live-stock.sold { background: var(--surface); color: var(--fg-3); }
+.live-listing h3 { margin: 18px 0 2px; font-family: var(--font-display); font-size: 17px; }
+.live-listing-model, .live-listing-price-detail { margin: 3px 0; color: var(--fg-3); font-size: 12.5px; }
+.live-listing-price { display: block; margin-top: 14px; font-family: var(--font-display); font-size: 26px; font-weight: var(--num-weight, 800); letter-spacing: -0.03em; }
+.live-listing-condition { min-height: 44px; margin: 14px 0; color: var(--fg-2); font-size: 13px; line-height: 1.65; }
+.live-listing-meta { display: grid; gap: 6px; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
+.live-listing-meta > div { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.live-listing-meta dt { color: var(--fg-3); }
+.live-listing-meta dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.live-evidence-details { margin-top: 14px; color: var(--fg-2); font-size: 12.5px; line-height: 1.55; }
+.live-evidence-details summary { cursor: pointer; font-weight: 700; }
+.live-evidence-details ul { padding-left: 18px; list-style: disc; }
+.live-evidence-details small { display: block; }
+.live-login-actions { margin-bottom: 10px; }
+.live-session-status { display: flex; justify-content: space-between; align-items: center; gap: 18px; font-family: var(--font); }
+.live-session-status > div { display: grid; gap: 5px; min-width: 0; }
+.live-session-status .live-code { color: var(--fg-2); }
 @media (max-width: 850px) {
   .live-columns { grid-template-columns: 1fr; }
   .live-snapshot dl { grid-template-columns: 1fr; }
@@ -117,12 +147,17 @@
 }
 @media (max-width: 560px) {
   .live-header { align-items: start; flex-direction: column; padding: 14px 20px; gap: 8px; }
+  .live-header > div { flex-wrap: wrap; }
   .live-main { width: calc(100% - 32px); padding-top: 28px; }
   .live-card { padding: 18px; }
   .live-card-head { align-items: start; flex-direction: column; }
   .live-card-head span { text-align: left; }
   .live-form { grid-template-columns: 1fr; }
   .live-session-form { align-items: stretch; flex-direction: column; }
+  .live-login-actions { align-items: stretch; flex-direction: column; }
+  .live-session-status { align-items: stretch; }
+  .live-session-status button { align-self: flex-start; }
+  .live-catalog-grid { grid-template-columns: 1fr; }
   .live-state { align-items: start; flex-direction: column; }
   .live-agreement-list li { align-items: start; flex-direction: column; }
 }

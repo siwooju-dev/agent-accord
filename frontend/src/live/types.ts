@@ -24,6 +24,28 @@ export interface DemoSession {
   wallet_address: Address;
 }
 
+export interface AuthChallenge {
+  request_id: string;
+  challenge_id: string;
+  message: string;
+  expires_at: string;
+}
+
+export interface PublicListing {
+  id: string;
+  seller_id: string;
+  title: string;
+  gpu_model: string;
+  asking_price_krw: number;
+  shipping_fee_krw: number;
+  condition_text: string;
+  warranty_end: string | null;
+  stock_status: "available" | "sold";
+  earliest_delivery_at: string;
+  evidence: Array<{ id: string; kind: string; label: string; summary: string }>;
+  source: "demo" | "seller_claimed";
+}
+
 export interface BuyerIntentInput {
   gpu_model: string;
   max_total_krw: number;

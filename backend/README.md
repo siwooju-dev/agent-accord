@@ -1,6 +1,6 @@
 # Agent Accord backend
 
-FastAPI implementation of the v0.1 contract in [`../api-spec.md`](../api-spec.md). The local store is SQLite; the app uses the existing `blockchain/` signing and relayer adapter.
+FastAPI implementation of API contract v0.2 in [`../api-spec.md`](../api-spec.md). The local store is SQLite; the app uses the existing `blockchain/` signing and relayer adapter.
 
 ## Local mock
 
@@ -19,7 +19,9 @@ DATABASE_PATH=data/demo.sqlite3 \
 .venv/bin/python -m uvicorn backend.main:app --reload --port 8000
 ```
 
-The frontend's Vite server proxies `/api` to `http://localhost:8000`. Open `/?mode=live` to use this API. `APP_MODE=mock` uses deterministic local agents. `CHAIN_MODE=mock` validates both EIP-712 signatures but never submits a transaction; the final status is `MOCK_RECORDED`, with no transaction hash.
+The frontend's Vite server proxies `/api` to `http://localhost:8000`. The root page is the API-backed application. `?mode=mock` opens the offline visual prototype. `APP_MODE=mock` uses deterministic local agents. `CHAIN_MODE=mock` validates both EIP-712 signatures but never submits a transaction; the final status is `MOCK_RECORDED`, with no transaction hash.
+
+Wallet authentication uses a five-minute, one-use, origin-bound signed challenge; the browser stores the bearer token only in memory. `GET /api/listings` returns public listing data without private seller policies or wallet addresses. The live-mode script disables impersonated demo sessions by default. See [`../docs/WEB_QA.md`](../docs/WEB_QA.md) for wallet and testnet flows.
 
 Interactive API docs are at `http://localhost:8000/docs`; the OpenAPI JSON is at `http://localhost:8000/openapi.json`.
 

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type {
   Agreement, AgreementSummary, ApprovalPayload, Audit, BuyerIntent,
-  BuyerIntentInput, DemoSession, Listing, ListingInput, Negotiation,
+  BuyerIntentInput, DemoSession, Listing, ListingInput, Negotiation, PublicListing, Role,
 } from "./types";
 import type { WalletState } from "./wallet";
 
@@ -12,6 +12,57 @@ const localDate = (days: number) => {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 };
 const short = (value: string) => value.length > 24 ? `${value.slice(0, 12)}…${value.slice(-10)}` : value;
+
+export function WalletLogin({ busy, onLogin }: { busy: boolean; onLogin: (role: Role) => void }) {
+  return <section className="live-card live-session">
+    <div className="live-card-head"><h2>지갑으로 시작</h2><span>로그인 서명은 거래 승인이 아닙니다</span></div>
+    <p>MetaMask 지갑으로 구매자 또는 판매자 역할을 확인합니다. 서명은 이 사이트에만 보내며, 로그인할 때 블록체인 트랜잭션은 발생하지 않습니다.</p>
+    <div className="live-actions live-login-actions">
+      <button className="live-primary" type="button" disabled={busy} onClick={() => onLogin("buyer")}>구매자로 지갑 연결</button>
+      <button type="button" disabled={busy} onClick={() => onLogin("seller")}>판매자로 지갑 연결</button>
+    </div>
+    <small>구매자와 판매자 역할은 서명한 지갑 주소에 연결됩니다. 합의 기록은 Base Sepolia 테스트넷에만 전송됩니다.</small>
+  </section>;
+}
+
+export function ListingCatalog({ items, busy, error }: {
+  items: PublicListing[];
+  busy: boolean;
+  error: string;
+}) {
+  return <section className="live-card live-catalog">
+    <div className="live-card-head"><h2>GPU 매물</h2><span>{busy ? "불러오는 중…" : `${items.length}개 · API 데이터`}</span></div>
+    {error && <p className="live-alert live-error" role="alert">매물을 불러오지 못했습니다. {error}</p>}
+    {!busy && !error && items.length === 0 && <p className="live-empty">등록된 매물이 없습니다.</p>}
+    <div className="live-catalog-grid">
+      {items.map((item) => <article className="live-listing" key={item.id}>
+        <div className="live-listing-head">
+          <span className={`live-listing-tag ${item.source === "demo" ? "demo" : "seller"}`}>
+            {item.source === "demo" ? "데모 매물" : "판매자 등록"}
+          </span>
+          <span className={item.stock_status === "available" ? "live-stock" : "live-stock sold"}>
+            {item.stock_status === "available" ? "판매 가능" : "판매 완료"}
+          </span>
+        </div>
+        <h3>{item.title}</h3>
+        <p className="live-listing-model">{item.gpu_model}</p>
+        <strong className="live-listing-price">{won(item.asking_price_krw + item.shipping_fee_krw)}</strong>
+        <p className="live-listing-price-detail">상품 {won(item.asking_price_krw)} · 배송 {won(item.shipping_fee_krw)}</p>
+        <p className="live-listing-condition">{item.condition_text}</p>
+        <dl className="live-listing-meta">
+          <div><dt>보증 만료</dt><dd>{item.warranty_end ?? "미기재"}</dd></div>
+          <div><dt>가장 빠른 배송</dt><dd>{item.earliest_delivery_at ? when(item.earliest_delivery_at) : "미기재"}</dd></div>
+          <div><dt>증빙</dt><dd>{item.evidence.length ? `${item.evidence.length}개 · 판매자 제출` : "없음"}</dd></div>
+        </dl>
+        {item.evidence.length > 0 && <details className="live-evidence-details">
+          <summary>증빙 요약 보기</summary>
+          <ul>{item.evidence.map((evidence) => <li key={evidence.id}><b>{evidence.label}</b> · {evidence.summary}</li>)}</ul>
+          <small>자료 설명은 제출자 주장입니다. AI의 일치 판정도 실물 검증을 뜻하지 않습니다.</small>
+        </details>}
+      </article>)}
+    </div>
+  </section>;
+}
 
 export function BuyerForm({ busy, intent, onCreate, onStart }: {
   busy: boolean;
@@ -65,10 +116,10 @@ export function SellerForm({ busy, listing, onCreate }: {
   const [minimum, setMinimum] = useState("1900000");
   const [shipping, setShipping] = useState("20000");
   const [earliest, setEarliest] = useState(localDate(2));
-  const [condition, setCondition] = useState("데모 매물 · 사용 12개월 · 박스 포함 (판매자 주장)");
-  const [warranty, setWarranty] = useState("2027-02-14");
+  const [condition, setCondition] = useState("");
+  const [warranty, setWarranty] = useState("");
   const [stock, setStock] = useState<"available" | "sold">("available");
-  const [evidence, setEvidence] = useState("evidence-01, evidence-02");
+  const [evidence, setEvidence] = useState("");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void onCreate({
@@ -86,10 +137,10 @@ export function SellerForm({ busy, listing, onCreate }: {
       <label>비공개 최저 상품가<input required type="number" min="1" max={ask} step="1" value={minimum} onChange={(event) => setMinimum(event.target.value)} /></label>
       <label>배송비 (KRW)<input required type="number" min="0" step="1" value={shipping} onChange={(event) => setShipping(event.target.value)} /></label>
       <label>가장 빠른 배송<input required type="datetime-local" value={earliest} onChange={(event) => setEarliest(event.target.value)} /></label>
-      <label>상태 설명<textarea required value={condition} onChange={(event) => setCondition(event.target.value)} /></label>
+      <label>상태 설명<textarea required placeholder="사용 기간, 구성품, 점검 내용 등을 적어주세요. 미확인 내용은 판매자 주장으로 표시됩니다." value={condition} onChange={(event) => setCondition(event.target.value)} /></label>
       <label>보증 만료일<input type="date" value={warranty} onChange={(event) => setWarranty(event.target.value)} /></label>
       <label>재고<select value={stock} onChange={(event) => setStock(event.target.value as "available" | "sold")}><option value="available">판매 가능</option><option value="sold">판매 완료</option></select></label>
-      <label>증빙 ID (쉼표로 구분)<input value={evidence} onChange={(event) => setEvidence(event.target.value)} /></label>
+      <label>데모 증빙 ID (선택, 쉼표로 구분)<input placeholder="아직 연결한 증빙이 없으면 비워 두세요" value={evidence} onChange={(event) => setEvidence(event.target.value)} /></label>
       <button className="live-primary" disabled={busy}>매물 등록</button>
     </form>
     {listing && <div className="live-result"><b>등록된 매물 {listing.id}</b><span>{listing.gpu_model} · {won(listing.asking_price_krw + listing.shipping_fee_krw)}</span><p>비공개 최저가: {won(listing.private_policy.min_item_price_krw)}</p></div>}

@@ -17,6 +17,16 @@ class DemoSessionInput(InputModel):
     actor_id: str = Field(min_length=1, max_length=80)
 
 
+class WalletAuthChallengeInput(InputModel):
+    wallet_address: str = Field(pattern=r"^0x[0-9a-fA-F]{40}$")
+    role: Literal["buyer", "seller"]
+
+
+class WalletAuthSessionInput(InputModel):
+    challenge_id: str = Field(min_length=1, max_length=80)
+    signature: str = Field(pattern=r"^0x[0-9a-fA-F]{130}$")
+
+
 class BuyerIntentInput(InputModel):
     gpu_model: str = Field(min_length=1, max_length=100)
     max_total_krw: int = Field(gt=0, le=100_000_000)
@@ -153,6 +163,17 @@ class DemoSessionView(BaseModel):
     wallet_address: str
 
 
+class WalletAuthChallengeView(BaseModel):
+    request_id: str
+    challenge_id: str
+    message: str
+    expires_at: str
+
+
+class WalletAuthSessionView(DemoSessionView):
+    pass
+
+
 class BuyerIntentView(BaseModel):
     request_id: str
     id: str
@@ -172,6 +193,26 @@ class ListingView(BaseModel):
     shipping_fee_krw: int
     evidence_ids: list[str]
     private_policy: dict[str, Any] | None = None
+
+
+class ListingCatalogItemView(BaseModel):
+    id: str
+    seller_id: str
+    title: str
+    gpu_model: str
+    asking_price_krw: int
+    shipping_fee_krw: int
+    condition_text: str
+    warranty_end: str | None
+    stock_status: Literal["available", "sold"]
+    earliest_delivery_at: str
+    evidence: list[dict[str, Any]]
+    source: Literal["demo", "seller_claimed"]
+
+
+class ListingCatalogView(BaseModel):
+    request_id: str
+    items: list[ListingCatalogItemView]
 
 
 class NegotiationStartView(BaseModel):
@@ -253,7 +294,7 @@ class AuditView(BaseModel):
 
 class HealthView(BaseModel):
     status: Literal["ok"] = "ok"
-    contract_version: Literal["0.1"] = "0.1"
+    contract_version: Literal["0.2"] = "0.2"
     mode: Literal["mock", "live"]
     chain_mode: Literal["mock", "live"] = "mock"
     kiln: dict[str, Any] = {}

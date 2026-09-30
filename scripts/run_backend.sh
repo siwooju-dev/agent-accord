@@ -3,10 +3,11 @@
 #   scripts/run_backend.sh live     (needs .env.local from scripts/setup_secrets.py and a deployed contract)
 #   scripts/run_backend.sh mock
 set -euo pipefail
+umask 077
 cd "$(dirname "$0")/.."
 mode="${1:-mock}"
 if [[ "$mode" == "live" ]]; then
-  export APP_MODE=live CHAIN_MODE=live ALLOW_DEMO_SESSIONS=true
+  export APP_MODE=live CHAIN_MODE=live ALLOW_DEMO_SESSIONS=false
   export DATABASE_PATH="${DATABASE_PATH:-data/live.sqlite3}"
 else
   export APP_MODE=mock CHAIN_MODE=mock ALLOW_DEMO_SESSIONS=true

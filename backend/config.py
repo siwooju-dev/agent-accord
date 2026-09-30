@@ -135,6 +135,26 @@ class Settings:
             raise ValueError("CHAIN_MODE must be mock or live")
         if self.mode == "live" and self.chain_mode != "live":
             raise ValueError("APP_MODE=live requires CHAIN_MODE=live")
+        if self.chain_mode == "live":
+            if self.mode != "live":
+                raise ValueError("CHAIN_MODE=live requires APP_MODE=live")
+            if self.chain_id != 84532:
+                raise ValueError("CHAIN_MODE=live is restricted to Base Sepolia chain ID 84532")
+        if self.mode == "live":
+            if self.allow_demo_sessions:
+                raise ValueError("APP_MODE=live does not allow demo sessions")
+            if self.actors == DEFAULT_ACTORS:
+                raise ValueError("APP_MODE=live requires explicitly configured demo wallets")
+            buyer_wallets = {
+                actor["wallet_address"].lower() for actor in self.actors.values()
+                if actor["role"] == "buyer"
+            }
+            seller_wallets = {
+                actor["wallet_address"].lower() for actor in self.actors.values()
+                if actor["role"] == "seller"
+            }
+            if not buyer_wallets or not seller_wallets or buyer_wallets & seller_wallets:
+                raise ValueError("APP_MODE=live requires distinct configured buyer and seller wallets")
         if self.chain_id <= 0 or self.session_seconds < 60 or self.session_seconds > 86400:
             raise ValueError("Invalid chain ID or session duration")
         if self.contract_address and not Web3.is_address(self.contract_address):

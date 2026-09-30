@@ -1,22 +1,24 @@
 # Agent Accord frontend
 
-React + TypeScript + Vite frontend for the GPU negotiation demo. The default page is the clearly labelled `demo/mock` prototype. `?mode=live` uses the `/api` contract from `project.md`, `frontend.md`, and `api-spec.md` on `main`. Live mode never substitutes mock results for API errors.
+React + TypeScript + Vite frontend. `/` is the API-backed application; `?mode=mock` opens the offline visual prototype. The live page shows backend, agent, and chain configuration from the API health response rather than a hard-coded status.
 
-## Run
+## Run locally
 
-```powershell
+```sh
 npm ci
-npm run dev
+npm run dev -- --host 127.0.0.1 --port 5180
 ```
 
-The live page is `http://localhost:5173/?mode=live`. Vite proxies local `/api` requests to `http://localhost:8000`. Requests forwarded through a public tunnel are blocked from the demo API. Start the FastAPI app from the repository root with `python -m uvicorn backend.main:app --reload --port 8000` after the backend team provides it. The current API document describes a planned contract, so live requests show a connection error until that service exists.
+Run the API separately from the repository root. The Vite proxy sends `/api` to `http://localhost:8000`; set `ACCORD_API_TARGET` if the API uses another local port. Wallet login requires an EIP-1193 browser wallet and Base Sepolia. Login signs a short-lived message; approvals use EIP-712 and the application never reads wallet private keys.
 
-The demo session token stays in browser memory. Configure demo actor wallets and Base Sepolia contract data on the backend; the selected actor's `wallet_address`, agreement `expected_wallet`, and connected browser wallet must agree. The frontend requests EIP-712 signatures from the browser wallet and never handles private keys. Only a server verified testnet receipt, event, and recorded hash are presented as a confirmed chain record.
+## Public tunnel
+
+For a temporary ngrok preview, use the production build, keep the backend bound to loopback, set `ACCORD_API_TARGET` to that backend, and explicitly set `ACCORD_PUBLIC_TUNNEL_API=true` on the Vite preview process. The local API proxy then accepts only same-origin HTTPS requests whose forwarded host is an ngrok domain. Do not expose the backend port or put secrets in Vite variables. See [`../docs/WEB_QA.md`](../docs/WEB_QA.md).
 
 ## Check
 
-```powershell
+```sh
 npm run lint
-npm run test
+npm test
 npm run build
 ```

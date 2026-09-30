@@ -94,17 +94,17 @@ DEMO_SELLER_WALLET=0x...  # MetaMask 계정 2 (데모 판매자 3명이 같이 �
 
 ```sh
 .venv/bin/python scripts/kiln_smoke.py     # (선택) 체인 없이 Kiln 협상 1회 점검
-scripts/run_backend.sh live                # Kiln + Base Sepolia, DB는 data/live.sqlite3
-cd frontend && npm run dev                 # http://localhost:5173/?mode=live
+DATABASE_PATH=.local/live.sqlite3 PORT=8001 bash scripts/run_backend.sh live  # Kiln + Base Sepolia; demo-session auth off
+cd frontend && ACCORD_API_TARGET=http://127.0.0.1:8001 npm run dev -- --host 127.0.0.1 --port 5180
 ```
 
-체인·Kiln 없이 화면만 보려면 `scripts/run_backend.sh mock`, 디자인 데모는 `http://localhost:5173/`.
+기본 `/` 화면은 디자인한 메인 앱이며 지갑 로그인(구매자/판매자)과 실제 API로 동작한다. `?mode=console`은 같은 API를 쓰는 개발용 콘솔, `?mode=mock`은 API 없이 보는 오프라인 디자인 시안이다. 체인·Kiln 없이 기능을 확인하려면 `scripts/run_backend.sh mock`을 실행하고, 로그인 세션은 서명된 Base Sepolia 지갑으로 만든다. 자세한 웹 QA 절차는 [`docs/WEB_QA.md`](docs/WEB_QA.md)를 본다.
 
 ### 4. 화면에서
 
-1. `buyer-demo`로 세션 → MetaMask 계정 1 연결(Base Sepolia 자동 추가) → 조건 입력 → **협상 시작**. 20초 안팎에 합의안이 나온다.
+1. **구매자로 지갑 연결** → Base Sepolia 전환 → 로그인 문구 서명 → 조건 입력 → **협상 시작**. Kiln/API 실패는 화면에 오류로 표시되고 mock 결과로 바꾸지 않는다.
 2. 합의안 확인 → 구매자 서명.
-3. `seller-demo-N`(합의안의 판매자)으로 세션 → MetaMask 계정 2로 바꾸고 → 같은 합의안에 서명.
+3. 별도 브라우저 프로필에서 **판매자로 지갑 연결** → 판매자 지갑으로 로그인 → 같은 합의안 새로고침 후 서명.
 4. 두 서명이 모이면 relayer가 기록하고, `RECORDED`와 BaseScan 링크가 뜬다. **흐름 감사**에서 Kiln 호출(generation id·토큰·비용)과 이벤트를 볼 수 있다.
 
 ### 5. 스크립트로 흐름 실행 (선택)
@@ -113,7 +113,7 @@ cd frontend && npm run dev                 # http://localhost:5173/?mode=live
 .venv/bin/python scripts/run_flows.py A B C
 ```
 
-두 번째 live 백엔드(포트 8011, `data/live-script.sqlite3`)를 띄우고, 웹 화면과 같은 HTTP API로 조건 입력 → Kiln 협상 → 양측 EIP-712 서명 → Base Sepolia 기록까지 진행한다. 서명은 `.local/test_wallets.json`(git 제외, 테스트넷 전용, 잔액 없음)의 로컬 테스트 지갑이 한다. MetaMask 서명은 브라우저 흐름에서만 쓴다.
+두 번째 live 백엔드(포트 8011, `data/live-script.sqlite3`)를 띄우고, 웹 화면과 같은 HTTP API로 지갑 challenge 로그인 → 조건 입력 → Kiln 협상 → 양측 EIP-712 서명 → Base Sepolia 기록까지 진행한다. 데모 세션 API는 끈 채로 실행하며 서명은 `.local/test_wallets.json`(git 제외, 테스트넷 전용)의 로컬 테스트 지갑이 한다. MetaMask 서명은 브라우저 흐름에서만 쓴다.
 
 ### 6. 증빙 내보내기
 
@@ -128,7 +128,7 @@ cd frontend && npm run dev                 # http://localhost:5173/?mode=live
 
 흐름 3개: 기본 조건 → 예산을 낮춘 조건 → 배송 기한을 당긴 조건. 흐름마다 Kiln 호출 기록과 합의 기록 트랜잭션이 있다.
 
-- **A**는 웹 화면(`/?mode=live`)에서 MetaMask 계정 2개로 구매자·판매자가 직접 서명했다.
+- **A**는 웹 화면(당시 API 콘솔)에서 MetaMask 계정 2개로 구매자·판매자가 직접 서명했다.
 - **B, C**는 `scripts/run_flows.py`가 같은 API와 같은 컨트랙트로 실행하고, 로컬 테스트 지갑으로 서명했다.
 - 세 흐름 모두 Kiln `qwen3-32b` 실제 호출이고, 트랜잭션은 AgreementRegistry가 두 서명을 검증한 뒤 남긴 기록이다.
 
@@ -174,9 +174,9 @@ Kiln 에이전트 테스트는 가짜 HTTP 응답으로 `<think>` 처리, 재질
 
 | 경로 | 내용 |
 |---|---|
-| `backend/` | FastAPI API v0.1 ([`api-spec.md`](api-spec.md)), Kiln 에이전트, 규칙 검사, SQLite |
+| `backend/` | FastAPI API v0.2 ([`api-spec.md`](api-spec.md)), wallet auth, Kiln 에이전트, 규칙 검사, SQLite |
 | `blockchain/` | EIP-712 서명 데이터, relayer 어댑터, 배포 스크립트, 배포 기록 |
 | `contracts/` | AgreementRegistry (Solidity 0.8.28) |
-| `frontend/` | React 웹. `/?mode=live`가 실제 API 흐름, `/`는 디자인 데모 ([`DESIGN.md`](DESIGN.md)) |
+| `frontend/` | React 웹. `/`가 실제 API에 연결된 메인 앱(`src/connected/`), `?mode=console`은 API 콘솔, `?mode=mock`은 오프라인 디자인 시안 ([`DESIGN.md`](DESIGN.md)) |
 | `scripts/` | 비밀값 설정, 배포, Kiln 점검, 실행, 증빙 내보내기 |
-| `docs/` | 증빙 (`PROOF.md`, `proof/`) |
+| `docs/` | 증빙 (`PROOF.md`, `proof/`) 및 웹 QA 안내 |

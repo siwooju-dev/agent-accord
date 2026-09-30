@@ -8,7 +8,6 @@ import {
   DEMO_BUYER_INTENT,
   DEMO_EVIDENCE,
   DEMO_LISTINGS,
-  DEMO_NOTICE,
   DEMO_OFFERS,
   INITIAL_AUDIT_EVENTS,
 } from "./data/demo";
@@ -403,10 +402,8 @@ function App() {
       </main>
 
       <footer className="footer">
-        <span>
-          <Icon name="alert" size={13} /> {DEMO_NOTICE}
-        </span>
-        <span>Kiln · 테스트넷 · 실제 지갑 미연결 · UI 시안</span>
+        <span><Icon name="alert" size={13} /> 오프라인 디자인 시안 · 실제 API와 지갑 서명은 연결되지 않음</span>
+        <span>합의 기록은 테스트넷 전용 · 실제 결제 없음</span>
         <details className="credits">
           <summary>사진 · 영상 출처 {ALL_CREDITS.length}건</summary>
           <p>매물 사진과 영상은 Wikimedia Commons의 자유 라이선스 자료예요. 매물·판매자·영수증은 가상이에요.</p>
@@ -450,7 +447,7 @@ function App() {
 
 /* ───────────── design switcher (top bar) ───────────── */
 
-function LookBar({ look, setLook }: { look: LookId; setLook: (id: LookId) => void }) {
+export function LookBar({ look, setLook }: { look: LookId; setLook: (id: LookId) => void }) {
   const current = lookById(look);
   return (
     <div className="lookbar" role="region" aria-label="디자인 시안 선택">
@@ -494,7 +491,7 @@ interface BackendHealth {
   chain?: { chain_id?: number; contract_address?: string | null };
 }
 
-function BackendChip() {
+export function BackendChip() {
   const [info, setInfo] = useState<BackendHealth | null>(null);
   useEffect(() => {
     if (import.meta.env.VITE_BACKEND_PROBE === "off") return;
@@ -523,7 +520,7 @@ function BackendChip() {
   );
 }
 
-function BrandMark() {
+export function BrandMark() {
   return (
     <svg className="brand-mark" width="26" height="26" viewBox="0 0 28 28" aria-hidden="true">
       <rect width="28" height="28" rx="8" className="brand-mark-bg" />
@@ -534,7 +531,7 @@ function BrandMark() {
   );
 }
 
-function PageHead({ page, role }: { page: Exclude<PageKey, "overview">; role: UserRole }) {
+export function PageHead({ page, role }: { page: Exclude<PageKey, "overview">; role: UserRole }) {
   const copy = pageCopy[page];
   return (
     <header className="page-head">
@@ -548,7 +545,7 @@ function PageHead({ page, role }: { page: Exclude<PageKey, "overview">; role: Us
   );
 }
 
-function Card({ title, sub, action, className = "", children }: { title: string; sub?: string; action?: ReactNode; className?: string; children: ReactNode }) {
+export function Card({ title, sub, action, className = "", children }: { title: string; sub?: string; action?: ReactNode; className?: string; children: ReactNode }) {
   return (
     <section className={"card " + className}>
       <header className="card-head">
@@ -563,12 +560,13 @@ function Card({ title, sub, action, className = "", children }: { title: string;
   );
 }
 
-function StatusPill({ status }: { status: string }) {
+export function StatusPill({ status }: { status: string }) {
   const labels: Record<string, string> = {
     PROPOSED: "서명 전",
     AWAITING_APPROVALS: "한쪽 서명 완료",
     RECORDING: "기록 대기",
     RECORDED: "기록 완료",
+    MOCK_RECORDED: "서명 완료 · mock 체인",
     CHAIN_FAILED: "기록 실패",
     BLOCKED: "검사 차단",
     REJECTED: "거절됨",
@@ -735,7 +733,7 @@ const prefersReducedMotion = () => {
   }
 };
 
-function HeroBento({ openSheet }: { openSheet: OpenSheet }) {
+export function HeroBento({ openSheet }: { openSheet: OpenSheet }) {
   const main = LISTING_PHOTOS["listing-01"][0];
   const clip = EVIDENCE_VIEWS["evidence-03"].media;
   const serial = EVIDENCE_VIEWS["evidence-04"].media;
@@ -1034,7 +1032,6 @@ function Conditions({
 
       <div className="section-title">
         <h2>공개 매물</h2>
-        <p>모든 매물은 데모용 가상 데이터예요.</p>
       </div>
       <div className="listing-grid">
         {DEMO_LISTINGS.map((item) => {
@@ -1092,7 +1089,7 @@ function Conditions({
   );
 }
 
-function EvidenceList({ items, onOpen, dense = false }: { items: Evidence[]; onOpen: (id: string) => void; dense?: boolean }) {
+export function EvidenceList({ items, onOpen, dense = false }: { items: Evidence[]; onOpen: (id: string) => void; dense?: boolean }) {
   return (
     <ul className={"ev-rows" + (dense ? " dense" : "")}>
       {items.map((item) => {

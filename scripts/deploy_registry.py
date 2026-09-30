@@ -40,6 +40,9 @@ def main() -> int:
     rpc = os.getenv("CHAIN_RPC_URL", "https://sepolia.base.org")
     chain_id = int(os.getenv("CHAIN_ID", "84532"))
     explorer = os.getenv("CHAIN_EXPLORER_URL", "https://sepolia.basescan.org").rstrip("/")
+    if chain_id != 84532:
+        print("CHAIN_ID는 Base Sepolia 84532여야 합니다.", file=sys.stderr)
+        return 2
     key = os.getenv("RELAYER_PRIVATE_KEY", "").strip()
     if not key:
         print("RELAYER_PRIVATE_KEY가 없습니다. 먼저 scripts/setup_secrets.py --relayer 를 실행하세요.", file=sys.stderr)
