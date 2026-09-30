@@ -4,7 +4,7 @@
 
 **Agent Accord는 Kiln 기반 AI 에이전트가 구매자와 판매자 각자의 비공개 한도 안에서 중고 GPU 거래를 대신 협상하고, 두 사람이 같은 합의 내용에 각자 지갑으로 서명했을 때만 그 합의를 Base Sepolia에 기록하는 서비스입니다.**
 
-Track A · GWDC 2026 × Bricksum · 제출 브랜치: `release`
+Track A · GWDC 2026 × Bricksum · 제출 브랜치: `main`
 
 | | |
 |---|---|
@@ -97,12 +97,18 @@ sequenceDiagram
 - 판매자 최저가와 출고일은 구매자에게 가지 않습니다.
 - 판매 에이전트의 말은 구매자 화면에 금액을 가린 채 보여줍니다.
 
+## 우리 지갑 없이 확인하기
+
+- **증빙 확인에는 지갑이 필요 없습니다.** 위 표의 tx 링크는 BaseScan에서 바로 열리고, Kiln generation id·토큰·비용은 [`docs/PROOF.md`](docs/PROOF.md)와 [`docs/proof/kiln_calls.jsonl`](docs/proof/kiln_calls.jsonl)에 있습니다.
+- **공유 데모 사이트는 팀이 등록한 지갑만 로그인할 수 있습니다**(구매자 계정 1개, 판매자 계정 5개). 협상마다 Kiln 크레딧이, 기록마다 relayer 가스가 들고, 합의는 그 매물의 판매자 본인이 서명해야 유효하기 때문입니다. 양측 서명 과정은 데모 영상에서 보여줍니다.
+- **직접 해보려면** 아래 mock 모드를 쓰세요. 키도 지갑 허용 목록도 없어서 아무 MetaMask 계정으로 로그인할 수 있고, 에이전트와 체인 단계는 모의로 동작합니다. 실제 Kiln + Base Sepolia로 돌리려면 `.env.local`에 본인 MetaMask 주소 두 개를 넣으면 됩니다(실제 모드 참고).
+
 ## 실행 방법
 
 필요한 것: Python 3.12+, Node 20+, Kiln API 키, MetaMask 계정 2개, relayer용 Base Sepolia 테스트 ETH 약간.
 
 ```sh
-git clone https://github.com/siwooju-dev/agent-accord.git && cd agent-accord && git checkout release
+git clone https://github.com/siwooju-dev/agent-accord.git && cd agent-accord
 python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
 (cd contracts && npm ci && npm run compile)
 (cd frontend && npm ci)
@@ -158,8 +164,8 @@ cd frontend && ACCORD_API_TARGET=http://127.0.0.1:8001 npm run dev -- --host 127
 - **대회 전에 만든 것: 없음.** 이 저장소의 코드, 컨트랙트, 데이터, 문서는 모두 대회 기간에 작성했습니다. 첫 커밋은 2026-09-28 02:35 KST입니다(`git log --reverse`).
 - **그대로 쓴 외부 코드**: FastAPI, Pydantic, web3.py, eth-account, OpenAI Python SDK(Kiln 클라이언트), OpenZeppelin Contracts(ECDSA, EIP712), solc, React, Vite, viem, lucide-react.
 - **미디어**
-  - 매물 사진과 영상은 Wikimedia Commons(CC BY 3.0 / CC BY-SA 4.0), 종이 질감은 ambientCG(CC0) 자료입니다. 출처는 앱 하단과 [`DESIGN.md`](DESIGN.md)에 있습니다.
-  - 시드 매물 3개와 그 영수증·보증 조회 화면은 시연용으로 만든 가상 견본입니다.
+  - 매물 사진과 영상은 Wikimedia Commons(CC BY 3.0 / CC BY 4.0 / CC BY-SA 4.0), 종이 질감은 ambientCG(CC0) 자료입니다. 출처는 앱 하단과 [`DESIGN.md`](DESIGN.md)에 있습니다.
+  - 시드 매물 7개와 그 영수증·보증 조회 화면은 시연용으로 만든 가상 견본입니다.
 - **도구**: 개발 중에 AI 코딩 도구(OpenAI Codex, Claude)를 사용했습니다.
 
 ## 한계

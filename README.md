@@ -4,7 +4,7 @@
 
 **Agent Accord lets Kiln-powered AI agents negotiate a used-GPU deal for a buyer and a seller within each side's private limits, and records the agreement on Base Sepolia only after both people sign the same terms with their own wallets.**
 
-Track A · GWDC 2026 × Bricksum · Repository: `release` branch
+Track A · GWDC 2026 × Bricksum · Repository: `main` branch
 
 | | |
 |---|---|
@@ -87,12 +87,18 @@ sequenceDiagram
 
 **Privacy between the two sides**: the buyer's budget never reaches the seller agent or seller screen. The seller's floor and ship date never reach the buyer. Seller-agent text is shown to the buyer with amounts masked.
 
+## Checking it without our wallets
+
+- **The proof needs no wallet.** Every tx link above opens on BaseScan, and the Kiln generation ids, tokens and costs are in [`docs/PROOF.md`](docs/PROOF.md) and [`docs/proof/kiln_calls.jsonl`](docs/proof/kiln_calls.jsonl).
+- **Our shared demo site only accepts the team's registered wallets** (one buyer account, five seller accounts). This is on purpose: each negotiation spends Kiln credits, each record spends relayer gas, and a deal is only valid when the listing's own seller signs. The demo video shows both sides signing.
+- **To try it yourself**, use mock mode below: no keys and no wallet allowlist, so any MetaMask account can sign in; the agents are mocked and the chain step is simulated. For real Kiln + Base Sepolia, put your own two MetaMask addresses in `.env.local` (see Live).
+
 ## Run it
 
 Needs Python 3.12+, Node 20+, a Kiln API key, two MetaMask accounts, and a little Base Sepolia ETH for the relayer.
 
 ```sh
-git clone https://github.com/siwooju-dev/agent-accord.git && cd agent-accord && git checkout release
+git clone https://github.com/siwooju-dev/agent-accord.git && cd agent-accord
 python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
 (cd contracts && npm ci && npm run compile)
 (cd frontend && npm ci)
@@ -135,7 +141,7 @@ Keys live only in the git-ignored `.env.local` (mode 600) and the backend proces
 
 - **Before the event: nothing.** All code, contracts, data and docs in this repository were written during the event. The first commit is 2026-09-28 02:35 KST (`git log --reverse`).
 - **Third-party code used as-is**: FastAPI, Pydantic, web3.py, eth-account, OpenAI Python SDK (as the Kiln client), OpenZeppelin Contracts (ECDSA, EIP712), solc, React, Vite, viem, lucide-react.
-- **Media**: listing photos and clips from Wikimedia Commons (CC BY 3.0 / CC BY-SA 4.0), paper texture from ambientCG (CC0); credits in the app footer and [`DESIGN.md`](DESIGN.md). The three seeded listings, their receipts and warranty lookups are fictional samples made for the demo.
+- **Media**: listing photos and clips from Wikimedia Commons (CC BY 3.0 / CC BY 4.0 / CC BY-SA 4.0), paper texture from ambientCG (CC0); credits in the app footer and [`DESIGN.md`](DESIGN.md). The seven seeded listings, their receipts and warranty lookups are fictional samples made for the demo.
 - **Tools**: AI coding assistants (OpenAI Codex, Claude) were used during development.
 
 ## Limits

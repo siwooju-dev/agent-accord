@@ -1,6 +1,6 @@
 # Agent Accord API 명세 v0.2
 
-> **상태: release 브랜치 구현 계약.** 이 문서는 `project.md`와 역할 문서를 기준으로 정한 서비스 HTTP API다. FastAPI 구현 및 OpenAPI와 대조한다. 지갑 인증과 공개 매물 조회를 추가해 v0.2로 올렸다. 이 체크아웃에는 `CONTRACTS.md`가 아직 없으므로 이 문서가 현재 공통 API 계약이다.
+> **상태: main 브랜치 구현 계약.** 이 문서는 `project.md`와 역할 문서를 기준으로 정한 서비스 HTTP API다. FastAPI 구현 및 OpenAPI와 대조한다. 지갑 인증과 공개 매물 조회를 추가해 v0.2로 올렸다. 이 체크아웃에는 `CONTRACTS.md`가 아직 없으므로 이 문서가 현재 공통 API 계약이다.
 
 ## 1. 범위와 공통 규칙
 
