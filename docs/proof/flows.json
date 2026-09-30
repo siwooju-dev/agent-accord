@@ -1,20 +1,20 @@
 [
   {
-    "flow_id": "flow-509a385b99244e38",
-    "label": "A · 기본 조건",
+    "flow_id": "flow-277788df043d4a48",
+    "label": "1 · 정상 실행 (웹 · MetaMask)",
     "signed_by": "MetaMask in the web UI",
-    "started_at": "2026-09-29T13:30:46Z",
+    "started_at": "2026-09-30T01:23:32Z",
     "intent": {
       "gpu_model": "RTX 4090",
       "max_total_krw": 2400000,
-      "delivery_deadline": "2026-10-09T13:30:00Z",
+      "delivery_deadline": "2026-10-10T14:59:00Z",
       "must_have": [
-        "evidence_present"
+        "warranty_active"
       ]
     },
     "negotiation_status": "AWAITING_APPROVALS",
     "blocked": [
-      "BUYER_REJECTED_COUNTER",
+      "INVALID_MODEL_OUTPUT",
       "BUYER_AGENT_SKIPPED"
     ],
     "offers": [
@@ -26,100 +26,100 @@
       }
     ],
     "agreement": {
-      "id": "agreement-79e17c9a6e164093",
+      "id": "agreement-b4eaafa4774647fb",
       "status": "RECORDED",
       "listing_id": "listing-demo-3",
       "total_krw": 2105000,
-      "snapshot_hash": "0x45434e6e903ccbb33ed7eb996fbfbd7d9352cdf209a2e95b5107301ab5059e52",
+      "snapshot_hash": "0xdccc4aea31d4de2dd39dabddb7d78f4e5daa223ab4ce8966704441f39761cf44",
       "buyer_wallet": "0xc96adf4a4014bb096f77d8e658f10a2c280c47b7",
       "seller_wallet": "0x7429b5764dffecbfcc90f48413f77e363fcb6530",
-      "tx_hash": "0x10afa7beea789bb553967366342599273839c29536e641eacc1b1851fc616ec2",
-      "block_number": 47462235,
+      "tx_hash": "0x42099967ade43a437993739e40e400be50b007f1516a875fc0fbfc24811ca1e6",
+      "block_number": 47481819,
       "receipt_status": "success",
       "rpc_check": {
         "status": 1,
-        "block_number": 47462235,
+        "block_number": 47481819,
         "to": "0x265756b7d5C4CeEd6976F87E54E44ED0921ac013",
         "logs": 1
       }
     },
     "events": [
       {
-        "at": "2026-09-29T13:30:46Z",
+        "at": "2026-09-30T01:23:32Z",
         "actor": "buyer-demo",
         "event_type": "NEGOTIATION_STARTED",
-        "object_id": "neg-eb589e2463974439",
+        "object_id": "neg-dc5e851750184e0c",
         "reason_code": null
       },
       {
-        "at": "2026-09-29T13:30:55Z",
-        "actor": "buyer-agent",
-        "event_type": "COUNTER_REJECTED",
-        "object_id": "listing-demo-1",
-        "reason_code": "BUYER_REJECTED_COUNTER"
+        "at": "2026-09-30T01:23:41Z",
+        "actor": "agent",
+        "event_type": "MODEL_CALL_FAILED",
+        "object_id": "listing-4648f85dfc494c32",
+        "reason_code": "INVALID_MODEL_OUTPUT"
       },
       {
-        "at": "2026-09-29T13:30:59Z",
+        "at": "2026-09-30T01:23:45Z",
         "actor": "buyer-agent",
         "event_type": "LISTING_SKIPPED",
         "object_id": "listing-demo-2",
         "reason_code": "BUYER_AGENT_SKIPPED"
       },
       {
-        "at": "2026-09-29T13:31:07Z",
+        "at": "2026-09-30T01:23:54Z",
         "actor": "server",
         "event_type": "OFFER_ALLOWED",
         "object_id": "listing-demo-3",
         "reason_code": null
       },
       {
-        "at": "2026-09-29T13:31:07Z",
+        "at": "2026-09-30T01:23:54Z",
         "actor": "server",
         "event_type": "AGREEMENT_CREATED",
-        "object_id": "agreement-79e17c9a6e164093",
+        "object_id": "agreement-b4eaafa4774647fb",
         "reason_code": null
       },
       {
-        "at": "2026-09-29T13:34:44Z",
+        "at": "2026-09-30T01:24:42Z",
         "actor": "buyer-demo",
         "event_type": "AGREEMENT_APPROVED",
-        "object_id": "agreement-79e17c9a6e164093",
+        "object_id": "agreement-b4eaafa4774647fb",
         "reason_code": null
       },
       {
-        "at": "2026-09-29T14:39:13Z",
-        "actor": "seller-demo-3",
+        "at": "2026-09-30T01:32:02Z",
+        "actor": "seller-demo-1",
         "event_type": "AGREEMENT_APPROVED",
-        "object_id": "agreement-79e17c9a6e164093",
+        "object_id": "agreement-b4eaafa4774647fb",
         "reason_code": null
       },
       {
-        "at": "2026-09-29T14:39:16Z",
-        "actor": "chain",
-        "event_type": "CHAIN_PENDING",
-        "object_id": "agreement-79e17c9a6e164093",
-        "reason_code": null
-      },
-      {
-        "at": "2026-09-29T14:39:21Z",
+        "at": "2026-09-30T01:32:06Z",
         "actor": "chain",
         "event_type": "AGREEMENT_RECORDED",
-        "object_id": "agreement-79e17c9a6e164093",
+        "object_id": "agreement-b4eaafa4774647fb",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-30T01:32:06Z",
+        "actor": "chain",
+        "event_type": "AGREEMENT_RECORDED",
+        "object_id": "agreement-b4eaafa4774647fb",
         "reason_code": null
       }
     ],
     "skipped_candidates": [],
     "kiln": {
-      "calls": 12,
-      "ok": 10,
-      "input_tokens": 5103,
+      "calls": 11,
+      "ok": 8,
+      "input_tokens": 4717,
       "output_tokens": 1067,
-      "cost_usd": 0.00063552
+      "cost_usd": 0.00057808
     }
   },
   {
     "flow_id": "flow-d3c9de1012d643ea",
-    "label": "B · 예산 감소",
+    "label": "2 · 예산 변경 재실행",
     "signed_by": "local test wallets via scripts/run_flows.py",
     "started_at": "2026-09-29T14:42:01Z",
     "intent": {
@@ -239,7 +239,7 @@
   },
   {
     "flow_id": "flow-675dd1434e82423f",
-    "label": "C · 기한 단축",
+    "label": "3 · 기한 변경 재실행",
     "signed_by": "local test wallets via scripts/run_flows.py",
     "started_at": "2026-09-29T14:42:15Z",
     "intent": {
@@ -355,6 +355,204 @@
       "input_tokens": 1714,
       "output_tokens": 385,
       "cost_usd": 0.00020624
+    }
+  },
+  {
+    "flow_id": "flow-99b404fe715d421b",
+    "label": "4 · 목표 불가 → 거절",
+    "signed_by": null,
+    "started_at": "2026-09-30T01:34:46Z",
+    "intent": {
+      "gpu_model": "RTX 4090",
+      "max_total_krw": 1000000,
+      "delivery_deadline": "2026-10-10T14:59:00Z",
+      "must_have": [
+        "evidence_present"
+      ]
+    },
+    "negotiation_status": "BLOCKED",
+    "blocked": [
+      "BUDGET_EXCEEDED",
+      "BUDGET_EXCEEDED",
+      "BUDGET_EXCEEDED"
+    ],
+    "offers": [],
+    "agreement": null,
+    "events": [
+      {
+        "at": "2026-09-30T01:34:46Z",
+        "actor": "buyer-demo",
+        "event_type": "NEGOTIATION_STARTED",
+        "object_id": "neg-a081add14f044eb2",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-30T01:34:46Z",
+        "actor": "server",
+        "event_type": "CANDIDATE_BLOCKED",
+        "object_id": "listing-demo-1",
+        "reason_code": "BUDGET_EXCEEDED"
+      },
+      {
+        "at": "2026-09-30T01:34:46Z",
+        "actor": "server",
+        "event_type": "CANDIDATE_BLOCKED",
+        "object_id": "listing-demo-2",
+        "reason_code": "BUDGET_EXCEEDED"
+      },
+      {
+        "at": "2026-09-30T01:34:46Z",
+        "actor": "server",
+        "event_type": "CANDIDATE_BLOCKED",
+        "object_id": "listing-demo-3",
+        "reason_code": "BUDGET_EXCEEDED"
+      },
+      {
+        "at": "2026-09-30T01:34:46Z",
+        "actor": "server",
+        "event_type": "BLOCKED",
+        "object_id": "neg-a081add14f044eb2",
+        "reason_code": "BUDGET_EXCEEDED"
+      }
+    ],
+    "skipped_candidates": [
+      {
+        "listing_id": "listing-demo-1",
+        "reason_code": "BUDGET_EXCEEDED"
+      },
+      {
+        "listing_id": "listing-demo-2",
+        "reason_code": "BUDGET_EXCEEDED"
+      },
+      {
+        "listing_id": "listing-demo-3",
+        "reason_code": "BUDGET_EXCEEDED"
+      }
+    ],
+    "kiln": {
+      "calls": 0,
+      "ok": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cost_usd": 0
+    }
+  },
+  {
+    "flow_id": "flow-509a385b99244e38",
+    "label": "(참고) 첫 MetaMask 실행",
+    "signed_by": "MetaMask in the web UI",
+    "started_at": "2026-09-29T13:30:46Z",
+    "intent": {
+      "gpu_model": "RTX 4090",
+      "max_total_krw": 2400000,
+      "delivery_deadline": "2026-10-09T13:30:00Z",
+      "must_have": [
+        "evidence_present"
+      ]
+    },
+    "negotiation_status": "AWAITING_APPROVALS",
+    "blocked": [
+      "BUYER_REJECTED_COUNTER",
+      "BUYER_AGENT_SKIPPED"
+    ],
+    "offers": [
+      {
+        "listing_id": "listing-demo-3",
+        "title": "ROG Strix RTX 4090",
+        "round": 2,
+        "total_krw": 2105000
+      }
+    ],
+    "agreement": {
+      "id": "agreement-79e17c9a6e164093",
+      "status": "RECORDED",
+      "listing_id": "listing-demo-3",
+      "total_krw": 2105000,
+      "snapshot_hash": "0x45434e6e903ccbb33ed7eb996fbfbd7d9352cdf209a2e95b5107301ab5059e52",
+      "buyer_wallet": "0xc96adf4a4014bb096f77d8e658f10a2c280c47b7",
+      "seller_wallet": "0x7429b5764dffecbfcc90f48413f77e363fcb6530",
+      "tx_hash": "0x10afa7beea789bb553967366342599273839c29536e641eacc1b1851fc616ec2",
+      "block_number": 47462235,
+      "receipt_status": "success",
+      "rpc_check": {
+        "status": 1,
+        "block_number": 47462235,
+        "to": "0x265756b7d5C4CeEd6976F87E54E44ED0921ac013",
+        "logs": 1
+      }
+    },
+    "events": [
+      {
+        "at": "2026-09-29T13:30:46Z",
+        "actor": "buyer-demo",
+        "event_type": "NEGOTIATION_STARTED",
+        "object_id": "neg-eb589e2463974439",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T13:30:55Z",
+        "actor": "buyer-agent",
+        "event_type": "COUNTER_REJECTED",
+        "object_id": "listing-demo-1",
+        "reason_code": "BUYER_REJECTED_COUNTER"
+      },
+      {
+        "at": "2026-09-29T13:30:59Z",
+        "actor": "buyer-agent",
+        "event_type": "LISTING_SKIPPED",
+        "object_id": "listing-demo-2",
+        "reason_code": "BUYER_AGENT_SKIPPED"
+      },
+      {
+        "at": "2026-09-29T13:31:07Z",
+        "actor": "server",
+        "event_type": "OFFER_ALLOWED",
+        "object_id": "listing-demo-3",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T13:31:07Z",
+        "actor": "server",
+        "event_type": "AGREEMENT_CREATED",
+        "object_id": "agreement-79e17c9a6e164093",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T13:34:44Z",
+        "actor": "buyer-demo",
+        "event_type": "AGREEMENT_APPROVED",
+        "object_id": "agreement-79e17c9a6e164093",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:39:13Z",
+        "actor": "seller-demo-3",
+        "event_type": "AGREEMENT_APPROVED",
+        "object_id": "agreement-79e17c9a6e164093",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:39:16Z",
+        "actor": "chain",
+        "event_type": "CHAIN_PENDING",
+        "object_id": "agreement-79e17c9a6e164093",
+        "reason_code": null
+      },
+      {
+        "at": "2026-09-29T14:39:21Z",
+        "actor": "chain",
+        "event_type": "AGREEMENT_RECORDED",
+        "object_id": "agreement-79e17c9a6e164093",
+        "reason_code": null
+      }
+    ],
+    "skipped_candidates": [],
+    "kiln": {
+      "calls": 12,
+      "ok": 10,
+      "input_tokens": 5103,
+      "output_tokens": 1067,
+      "cost_usd": 0.00063552
     }
   }
 ]

@@ -263,6 +263,7 @@ export default function ConnectedApp() {
       }).catch(() => undefined);
     }
     return () => controller.abort();
+    // Runs once per settled status; the agreement id check above prevents refetch loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, negotiation?.status, negotiation?.flow_id]);
 
@@ -457,6 +458,7 @@ export default function ConnectedApp() {
     if (first && LISTING_PHOTOS[mediaId]) setSheet({ listingId: mediaId, itemId: first });
   }, []);
 
+  const sheetListing = sheet ? catalog.find((item) => MEDIA_ID[item.id] === sheet.listingId) : undefined;
   const pendingForMe = agreements.filter((item) => item.status === "AWAITING_APPROVALS"
     && !(role === "buyer" ? item.buyer_approved : item.seller_approved));
 
@@ -545,9 +547,7 @@ export default function ConnectedApp() {
           itemId={sheet.itemId}
           onSelect={(itemId) => setSheet((value) => (value ? { ...value, itemId } : value))}
           onClose={() => setSheet(null)}
-          priceKrw={catalog.find((item) => MEDIA_ID[item.id] === sheet.listingId)
-            ? (() => { const item = catalog.find((entry) => MEDIA_ID[entry.id] === sheet.listingId)!; return item.asking_price_krw + item.shipping_fee_krw; })()
-            : undefined}
+          priceKrw={sheetListing ? sheetListing.asking_price_krw + sheetListing.shipping_fee_krw : undefined}
           now={now}
         />
       )}

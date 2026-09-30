@@ -19,7 +19,7 @@ import {
   mockWalletAddress,
   validateOffers,
 } from "./lib/mockApi";
-import { LOOKS, lookById, readStoredLook, storeLook, type LookId } from "./looks";
+import { readStoredLook, storeLook, type LookId } from "./looks";
 import type { AgreementSnapshot, AuditEvent, BuyerIntent, Evidence, Listing, PageKey, UserRole } from "./types";
 import "./App.css";
 
@@ -429,42 +429,6 @@ function App() {
           </button>
         </div>
       )}
-    </div>
-  );
-}
-
-/* ───────────── design switcher (top bar) ───────────── */
-
-export function LookBar({ look, setLook }: { look: LookId; setLook: (id: LookId) => void }) {
-  const current = lookById(look);
-  return (
-    <div className="lookbar" role="region" aria-label="디자인 시안 선택">
-      <span className="lookbar-label">디자인 시안</span>
-      <div className="lookbar-options" role="radiogroup" aria-label="시안">
-        {LOOKS.map((item, index) => (
-          <button
-            key={item.id}
-            type="button"
-            role="radio"
-            aria-checked={item.id === look}
-            className={"look-option" + (item.id === look ? " is-on" : "")}
-            onClick={() => setLook(item.id)}
-            title={`${item.name} · ${item.tagline} (키보드 ${index + 1})`}
-          >
-            <span className="look-swatch" aria-hidden="true">
-              {item.swatch.map((color) => (
-                <i key={color} style={{ background: color }} />
-              ))}
-            </span>
-            <b>
-              {item.key} · {item.name}
-            </b>
-          </button>
-        ))}
-      </div>
-      <span className="lookbar-note">
-        {current.tagline} <kbd>1</kbd> <kbd>2</kbd>
-      </span>
     </div>
   );
 }

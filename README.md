@@ -1,182 +1,156 @@
 # Agent Accord
 
-**구매자와 판매자가 중고 GPU 거래 조건을 입력하면 Kiln API의 Qwen3-32B 에이전트들이 증빙을 검토하고 협상해 합의안을 만들고, 양측이 같은 합의 내용에 지갑으로 서명하면 그 기록을 Base Sepolia 테스트넷 트랜잭션으로 남기는 구매 지원 서비스.**
+**Agent Accord lets Kiln-powered AI agents negotiate a used-GPU deal for a buyer and a seller within each side's private limits, and records the agreement on Base Sepolia only after both people sign the same terms with their own wallets.**
 
-- AI는 **판단과 협상**을 한다: 증빙 요약의 일관성 검토, 구매 제안, 판매 응답(수락·역제안·거절), 역제안에 대한 구매 답변.
-- 서버 코드는 **규칙 검사**를 한다: 예산, 판매자 최저가, 배송 기한, 재고, 필수 조건. AI가 규칙을 어긴 답을 내면 버리고 한 번 다시 묻는다. 그래도 어기면 그 매물은 차단한다.
-- 체인은 **합의 기록**만 한다. 결제·인도·소유권 이전은 하지 않는다. 컨트랙트가 구매자·판매자 두 서명을 직접 검증한 뒤에만 기록한다.
+> 한 줄 소개: 구매자와 판매자가 조건만 정하면 Kiln(Qwen3-32B) 에이전트가 증빙을 검토하고 서로의 비공개 한도 안에서 흥정하며, 두 사람이 같은 합의서에 지갑으로 서명하면 그 합의를 Base Sepolia에 기록합니다.
 
-> 데모 데이터(매물·증빙·영수증)는 모두 가상이다. 증빙은 파일이 아니라 "파일에 무엇이 보이는지"를 적은 요약이며, AI는 요약끼리의 일관성만 판단한다. 진품·작동 여부를 확인했다고 주장하지 않는다.
+Track A · GWDC 2026 × Bricksum · Repository: `release` branch
 
-## 흐름
+| | |
+|---|---|
+| **AI (Kiln `qwen3-32b`)** | reviews each listing's evidence, makes the buyer's offer, answers as the seller (accept / counter / reject), answers counters, and can skip a listing it judges unsafe |
+| **Server rules** | budget, seller floor, delivery deadline, stock and must-haves are checked in code; a model answer that breaks a rule is discarded and re-asked once, then the listing is blocked |
+| **Chain** | `AgreementRegistry` verifies **both** EIP-712 signatures on-chain before it stores the agreement hash; payment and shipping are out of scope |
 
-```mermaid
-sequenceDiagram
-    participant B as 구매자 (MetaMask 계정 1)
-    participant UI as 웹 (React)
-    participant API as 백엔드 (FastAPI)
-    participant K as Kiln API · qwen3-32b
-    participant S as 판매자 (MetaMask 계정 2)
-    participant C as AgreementRegistry (Base Sepolia)
-    B->>UI: GPU 모델 · 예산 · 배송 기한 · 필수 조건
-    UI->>API: POST /api/buyer-intents, /api/negotiations
-    API->>API: 판매자 최저가·배송일로 사전 검사 (불가능한 매물은 AI 호출 생략)
-    loop 매물마다
-        API->>K: 증빙 검토 (assessor)
-        API->>K: 구매 제안 (buyer agent)
-        API->>K: 판매 응답 (seller agent, 비공개 최저가 사용)
-        API->>K: 역제안이면 구매 답변 (buyer agent)
-        API->>API: 규칙 검사 (예산·최저가·기한·재고·필수 조건)
-    end
-    API->>UI: 최저 총액 합의안 + EIP-712 서명 데이터
-    B->>API: 서명 (같은 snapshot hash)
-    S->>API: 서명 (같은 snapshot hash)
-    API->>C: recordAgreement(두 서명) — relayer
-    C-->>API: AgreementRecorded 이벤트 · receipt
-    API->>UI: RECORDED + tx hash (BaseScan 링크)
-```
+## Demo runs (Track A)
 
-## Kiln API 사용
+Each row is a real run: real Kiln calls and, where both people signed, a real Base Sepolia transaction. Per-call logs are in [`docs/PROOF.md`](docs/PROOF.md).
 
-| 역할 | 단계 | 입력 | 출력 (JSON) |
+| Run | Condition | What the agents did | Result |
 |---|---|---|---|
-| assessor | `assessment` | 매물 설명, 증빙 요약 | 증빙별 `consistent / conflicted / unverified` + 한국어 메모 |
-| buyer | `buyer_offer` | 구매 조건, 매물, 검토 결과 | 제안가·배송일·보증 문구 또는 `skip`(위험한 매물 건너뜀) |
-| seller | `seller_reply` | 매물, 비공개 최저가·출고일, 구매 제안 | `accept / counter / reject` + 가격·배송일 |
-| buyer | `buyer_reply` | 역제안 | `accept / reject` |
+| 1 · normal | budget ₩2,400,000 · 10 days | reviewed 3 listings; buyer agent **skipped Gaming OC** (warranty lookup shows another model); seller 01's agent broke the price rule twice, so the server blocked it; ROG Strix's seller agent countered and the buyer agent accepted | ROG Strix ₩2,105,000, signed in the web UI with MetaMask, recorded |
+| 2 · new budget | budget ₩2,000,000 | server dropped the two listings the budget can't reach **before any AI call**; agents closed on the Founders Edition | ₩1,920,000, recorded |
+| 3 · new deadline | deadline 3 days | listings that can't ship in time dropped before any AI call; seller agent countered on price/date | ₩1,940,000, recorded |
+| 4 · goal impossible | budget ₩1,000,000 | every listing is below its seller's floor, so Accord **declines with the reason for each** and spends no Kiln tokens | no agreement, nothing to sign or record |
 
-- 엔드포인트 `https://api.bricksum.com/v1/chat/completions`, 모델 `qwen3-32b` (OpenAI 호환). 시작할 때 `GET /models`로 모델을 확인한다.
-- Qwen3 `/no_think` 스위치로 추론 단계를 끈다(호출당 약 1~3초). `<think>` 블록과 코드펜스를 걷어내고 첫 JSON 객체만 쓴다.
-- 429·5xx·타임아웃은 `retry-after`/`x-ratelimit-reset`을 따라 최대 3번 시도한다. 401·402는 `KILN_AUTH_FAILED`, `KILN_CREDITS_EXHAUSTED`로 구분해 감사 로그에 남긴다.
-- **모든 호출을 기록한다**: `x-neocloud-generation-id`, 입력·출력·추론 토큰, `usage.cost`(USD), 지연, 결과. 프롬프트 원문과 키는 기록하지 않는다(프롬프트는 SHA-256만). 코드: [`backend/agent.py`](backend/agent.py)
+Declines are never silent: each stop is an audit event (`CANDIDATE_BLOCKED`, `LISTING_SKIPPED`, `COUNTER_REJECTED`, `OFFER_REJECTED` …) with a reason code, shown in the web UI under **기록**.
 
-## 블록체인 사용
-
-- 컨트랙트 [`contracts/src/AgreementRegistry.sol`](contracts/src/AgreementRegistry.sol) (Base Sepolia, chain 84532). 배포 정보: [`blockchain/deployments/base-sepolia.json`](blockchain/deployments/base-sepolia.json)
-- 합의 내용(가격·배송비·총액·배송일·보증·증빙 해시·양측 지갑·만료·nonce)을 정규화해 해시하고, 구매자와 판매자가 **같은 EIP-712 데이터**에 서명한다.
-- `recordAgreement`는 지정된 relayer만 부를 수 있고, 컨트랙트 안에서 두 서명을 `ECDSA.recover`로 검증한다. 구매자 nonce 재사용·만료·중복 기록을 막는다.
-- 백엔드는 receipt 성공 + `AgreementRecorded` 이벤트 + 컨트랙트 저장값이 모두 맞을 때만 `RECORDED`로 표시한다. mock 모드는 `MOCK_RECORDED`이며 tx hash가 없다.
-
-## 실행 방법
-
-필요: Python 3.12+, Node 20+, Chrome + MetaMask(계정 2개), Kiln API 키, Base Sepolia 테스트 ETH 약간(relayer용).
-
-```sh
-git clone https://github.com/siwooju-dev/agent-accord.git && cd agent-accord
-python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
-(cd contracts && npm ci && npm run compile)
-(cd frontend && npm ci)
-```
-
-### 1. 비밀값 (터미널에서 직접 입력)
-
-```sh
-.venv/bin/python scripts/setup_secrets.py
-```
-
-Kiln 키를 붙여넣으면(화면에 표시되지 않음) git에서 제외된 `.env.local`(권한 600)에 저장하고, `GET /models`로 확인한다. relayer 지갑이 없으면 새로 만들고 **주소만** 출력한다. 이 주소로 [Base Sepolia faucet](https://docs.base.org/base-chain/network-information/network-faucets)에서 테스트 ETH를 받는다. 키는 브라우저·Vite 변수에 절대 넣지 않는다.
-
-`.env.local`에 MetaMask 공개 주소 두 개를 추가한다(개인키 아님).
-
-```sh
-DEMO_BUYER_WALLET=0x...   # MetaMask 계정 1
-DEMO_SELLER_WALLET=0x...  # MetaMask 계정 2 (데모 판매자 3명이 같이 씀)
-```
-
-### 2. 컨트랙트 배포 (한 번)
-
-```sh
-.venv/bin/python scripts/deploy_registry.py --check   # relayer 주소·잔액 확인
-.venv/bin/python scripts/deploy_registry.py           # 배포 후 blockchain/deployments/base-sepolia.json 갱신
-```
-
-### 3. 실행
-
-```sh
-.venv/bin/python scripts/kiln_smoke.py     # (선택) 체인 없이 Kiln 협상 1회 점검
-DATABASE_PATH=.local/live.sqlite3 PORT=8001 bash scripts/run_backend.sh live  # Kiln + Base Sepolia; demo-session auth off
-cd frontend && ACCORD_API_TARGET=http://127.0.0.1:8001 npm run dev -- --host 127.0.0.1 --port 5180
-```
-
-기본 `/` 화면은 디자인한 메인 앱이며 지갑 로그인(구매자/판매자)과 실제 API로 동작한다. `?mode=console`은 같은 API를 쓰는 개발용 콘솔, `?mode=mock`은 API 없이 보는 오프라인 디자인 시안이다. 체인·Kiln 없이 기능을 확인하려면 `scripts/run_backend.sh mock`을 실행하고, 로그인 세션은 서명된 Base Sepolia 지갑으로 만든다. 자세한 웹 QA 절차는 [`docs/WEB_QA.md`](docs/WEB_QA.md)를 본다.
-
-### 4. 화면에서
-
-1. **구매자로 지갑 연결** → Base Sepolia 전환 → 로그인 문구 서명 → 조건 입력 → **협상 시작**. Kiln/API 실패는 화면에 오류로 표시되고 mock 결과로 바꾸지 않는다.
-2. 합의안 확인 → 구매자 서명.
-3. 별도 브라우저 프로필에서 **판매자로 지갑 연결** → 판매자 지갑으로 로그인 → 같은 합의안 새로고침 후 서명.
-4. 두 서명이 모이면 relayer가 기록하고, `RECORDED`와 BaseScan 링크가 뜬다. **흐름 감사**에서 Kiln 호출(generation id·토큰·비용)과 이벤트를 볼 수 있다.
-
-### 5. 스크립트로 흐름 실행 (선택)
-
-```sh
-.venv/bin/python scripts/run_flows.py A B C
-```
-
-두 번째 live 백엔드(포트 8011, `data/live-script.sqlite3`)를 띄우고, 웹 화면과 같은 HTTP API로 지갑 challenge 로그인 → 조건 입력 → Kiln 협상 → 양측 EIP-712 서명 → Base Sepolia 기록까지 진행한다. 데모 세션 API는 끈 채로 실행하며 서명은 `.local/test_wallets.json`(git 제외, 테스트넷 전용)의 로컬 테스트 지갑이 한다. MetaMask 서명은 브라우저 흐름에서만 쓴다.
-
-### 6. 증빙 내보내기
-
-```sh
-.venv/bin/python scripts/export_proof.py --db data/live.sqlite3 --db data/live-script.sqlite3 --verify \
-  --label <flow_id>="A · 기본 조건" --label <flow_id>="B · 예산 감소" --label <flow_id>="C · 기한 단축"
-```
-
-`docs/PROOF.md`, `docs/proof/flows.json`, `docs/proof/kiln_calls.jsonl`을 만들고 아래 표를 갱신한다. `--verify`는 tx receipt를 RPC에서 다시 확인한다. 같은 컨트랙트에 기록한 뒤에는 `data/live.sqlite3`를 지우지 않는다(구매자 nonce가 다시 1부터 시작해 거절된다).
-
-## API 사용 증빙 (Proof of API usage)
-
-흐름 3개: 기본 조건 → 예산을 낮춘 조건 → 배송 기한을 당긴 조건. 흐름마다 Kiln 호출 기록과 합의 기록 트랜잭션이 있다.
-
-- **A**는 웹 화면(당시 API 콘솔)에서 MetaMask 계정 2개로 구매자·판매자가 직접 서명했다.
-- **B, C**는 `scripts/run_flows.py`가 같은 API와 같은 컨트랙트로 실행하고, 로컬 테스트 지갑으로 서명했다.
-- 세 흐름 모두 Kiln `qwen3-32b` 실제 호출이고, 트랜잭션은 AgreementRegistry가 두 서명을 검증한 뒤 남긴 기록이다.
+## Proof of API usage (per flow)
 
 <!-- proof:start -->
 
 | Flow | Buyer condition | Kiln calls | Kiln cost | Agreement | Signed by | On-chain tx |
 |---|---|---|---|---|---|---|
-| A · 기본 조건 | RTX 4090 · 예산 2,400,000원 · 기한 2026-10-09 | 10/12 | $0.000636 | RECORDED 2,105,000원 | MetaMask in the web UI | [`0x10afa7be…616ec2`](https://sepolia.basescan.org/tx/0x10afa7beea789bb553967366342599273839c29536e641eacc1b1851fc616ec2) |
-| B · 예산 감소 | RTX 4090 · 예산 2,000,000원 · 기한 2026-10-09 | 3/3 | $0.000171 | RECORDED 1,920,000원 | local test wallets via scripts/run_flows.py | [`0x8dbadc19…804919`](https://sepolia.basescan.org/tx/0x8dbadc1998fb60276992c5a53c23bd746edd4577265d5a84a9e64c830d804919) |
-| C · 기한 단축 | RTX 4090 · 예산 2,400,000원 · 기한 2026-10-02 | 4/4 | $0.000206 | RECORDED 1,940,000원 | local test wallets via scripts/run_flows.py | [`0x92d71f32…96c269`](https://sepolia.basescan.org/tx/0x92d71f32579b00f205b4aec6c0646060f75d81f3fc4dcc278ae31614e296c269) |
+| 1 · 정상 실행 (웹 · MetaMask) | RTX 4090 · 예산 2,400,000원 · 기한 2026-10-10 | 8/11 | $0.000578 | RECORDED 2,105,000원 | MetaMask in the web UI | [`0x42099967…1ca1e6`](https://sepolia.basescan.org/tx/0x42099967ade43a437993739e40e400be50b007f1516a875fc0fbfc24811ca1e6) |
+| 2 · 예산 변경 재실행 | RTX 4090 · 예산 2,000,000원 · 기한 2026-10-09 | 3/3 | $0.000171 | RECORDED 1,920,000원 | local test wallets via scripts/run_flows.py | [`0x8dbadc19…804919`](https://sepolia.basescan.org/tx/0x8dbadc1998fb60276992c5a53c23bd746edd4577265d5a84a9e64c830d804919) |
+| 3 · 기한 변경 재실행 | RTX 4090 · 예산 2,400,000원 · 기한 2026-10-02 | 4/4 | $0.000206 | RECORDED 1,940,000원 | local test wallets via scripts/run_flows.py | [`0x92d71f32…96c269`](https://sepolia.basescan.org/tx/0x92d71f32579b00f205b4aec6c0646060f75d81f3fc4dcc278ae31614e296c269) |
+| 4 · 목표 불가 → 거절 | RTX 4090 · 예산 1,000,000원 · 기한 2026-10-10 | 0/0 | $0.000000 | BLOCKED  | - | - |
+| (참고) 첫 MetaMask 실행 | RTX 4090 · 예산 2,400,000원 · 기한 2026-10-09 | 10/12 | $0.000636 | RECORDED 2,105,000원 | MetaMask in the web UI | [`0x10afa7be…616ec2`](https://sepolia.basescan.org/tx/0x10afa7beea789bb553967366342599273839c29536e641eacc1b1851fc616ec2) |
 
-- Total Kiln cost for these flows: $0.001013 · 9,842 tokens
-- Model calls avoided: 4 candidate(s) failed the server's budget/deadline pre-check, so no Kiln call was made for them (about 3 calls each: assessment, buyer offer, seller reply).
-- Energy (assumption, not a measurement): at 0.3 Wh per 1,000 tokens, ≈ 2.95 Wh for these flows.
+- Total Kiln cost for these flows: $0.001591 · 15,626 tokens
+- Model calls avoided: 7 candidate(s) failed the server's budget/deadline pre-check, so no Kiln call was made for them (about 3 calls each: assessment, buyer offer, seller reply).
+- Energy (assumption, not a measurement): at 0.3 Wh per 1,000 tokens, ≈ 4.69 Wh for these flows.
 
 Full per-call log: [docs/PROOF.md](docs/PROOF.md)
 
 <!-- proof:end -->
 
-## 테스트
+How to read it:
+
+- **Kiln calls `ok/total`**: calls that did not end in `OK` are logged answers that broke a rule (`INVALID_OUTPUT`, re-asked once) or provider errors. Nothing is hidden or retried silently.
+- **Kiln log** ([`docs/proof/kiln_calls.jsonl`](docs/proof/kiln_calls.jsonl)): one line per call with the Kiln generation id (`x-neocloud-generation-id`), input/output/reasoning tokens, `usage.cost`, latency, outcome and the validated JSON answer. It holds no prompt text (only its SHA-256) and no key.
+- **On-chain**: each tx calls `recordAgreement` on [`0x265756b7d5C4CeEd6976F87E54E44ED0921ac013`](https://sepolia.basescan.org/address/0x265756b7d5C4CeEd6976F87E54E44ED0921ac013) and emits `AgreementRecorded`. `scripts/export_proof.py --verify` re-reads every receipt from the RPC. Deployment tx [`0x63d48e4b…ec5ab6`](https://sepolia.basescan.org/tx/0x63d48e4bcd3891bc591b8e1aa2d998097c060cb58a68b9b8e9fe247e6bec5ab6).
+- **Signers**: runs 1 and (참고) were signed by two MetaMask accounts in the browser. Runs 2 and 3 went through the same HTTP API and contract via [`scripts/run_flows.py`](scripts/run_flows.py), signed by local test wallets.
+- **Run 4** has no tx by design: there is no agreement to sign. Its audit trail is in `docs/proof/flows.json`.
+
+## How it works
+
+```mermaid
+sequenceDiagram
+    participant B as Buyer (MetaMask)
+    participant UI as Web app
+    participant API as Backend (FastAPI)
+    participant K as Kiln API · qwen3-32b
+    participant S as Seller (MetaMask)
+    participant C as AgreementRegistry (Base Sepolia)
+    B->>UI: sign in with wallet · model · budget · deadline · must-haves
+    UI->>API: POST /api/buyer-intents, /api/negotiations
+    API->>API: pre-check each listing against the seller's private floor and ship date (no AI call when impossible)
+    loop each remaining listing
+        API->>K: assessor: are the listing and its evidence consistent?
+        API->>K: buyer agent: offer (or skip)
+        API->>K: seller agent: accept / counter / reject (knows the private floor)
+        API->>K: buyer agent: answer the counter
+        API->>API: server rules on the final terms
+    end
+    API->>UI: cheapest valid offer as an agreement snapshot + EIP-712 data
+    B->>API: signature over the snapshot hash
+    S->>API: signature over the same hash
+    API->>C: recordAgreement(both signatures) via relayer
+    C-->>API: AgreementRecorded event + receipt
+    API->>UI: RECORDED + BaseScan link
+```
+
+**Kiln** ([`backend/agent.py`](backend/agent.py)): OpenAI-compatible `POST https://api.bricksum.com/v1/chat/completions`, model checked with `GET /models`. Qwen3 runs with `/no_think` (about 1–3 s a call). Replies are parsed to the first JSON object after removing `<think>` blocks and code fences, then validated in code. 429, 5xx and timeouts are retried up to 3 times, honouring `retry-after`. 401 and 402 are reported as `KILN_AUTH_FAILED` / `KILN_CREDITS_EXHAUSTED`.
+
+**Chain** ([`contracts/src/AgreementRegistry.sol`](contracts/src/AgreementRegistry.sol), [`blockchain/`](blockchain)): the snapshot (prices, total, delivery, warranty, evidence hashes, both wallets, expiry, buyer nonce) is canonicalised (RFC 8785) and hashed. Both parties sign the same EIP-712 message. Only the relayer can submit. The contract recovers both signers, rejects reused nonces, expired or duplicate agreements. The backend marks `RECORDED` only when the receipt, the event and the stored values all match.
+
+**Privacy between the two sides**: the buyer's budget never reaches the seller agent or seller screen. The seller's floor and ship date never reach the buyer. Seller-agent text is shown to the buyer with amounts masked.
+
+## Run it
+
+Needs Python 3.12+, Node 20+, a Kiln API key, two MetaMask accounts, and a little Base Sepolia ETH for the relayer.
 
 ```sh
-.venv/bin/python -m pytest -q backend/tests blockchain/tests
+git clone https://github.com/siwooju-dev/agent-accord.git && cd agent-accord && git checkout release
+python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
+(cd contracts && npm ci && npm run compile)
+(cd frontend && npm ci)
+```
+
+**Try without keys (mock agents, no chain):**
+
+```sh
+bash scripts/run_backend.sh mock                                   # API on 127.0.0.1:8000
+cd frontend && npm run dev -- --host 127.0.0.1 --port 5180         # open http://127.0.0.1:5180
+```
+
+**Live (Kiln + Base Sepolia):**
+
+```sh
+.venv/bin/python scripts/setup_secrets.py         # paste the Kiln key (hidden); creates a testnet relayer, prints its address only
+# add the two MetaMask public addresses to .env.local: DEMO_BUYER_WALLET=0x…  DEMO_SELLER_WALLET=0x…
+.venv/bin/python scripts/deploy_registry.py       # once, after funding the relayer from a faucet
+.venv/bin/python scripts/kiln_smoke.py            # optional: one Kiln negotiation, no chain
+DATABASE_PATH=data/live.sqlite3 PORT=8001 bash scripts/run_backend.sh live
+cd frontend && ACCORD_API_TARGET=http://127.0.0.1:8001 npm run dev -- --host 127.0.0.1 --port 5180
+```
+
+In the app, sign in with **구매자로 로그인** (account 1), pick a condition under **조건 · 매물**, and press **이 조건으로 협상 시작**. Watch the agents talk under **협상**, then sign under **합의 · 서명**. Log out, switch MetaMask to account 2, sign in with **판매자로 로그인**, and sign the same agreement. **기록** shows every event, each Kiln call and the BaseScan link.
+
+- Scripted runs: `.venv/bin/python scripts/run_flows.py A B C`.
+- Rebuild the proof: `scripts/export_proof.py --db data/live.sqlite3 --db data/live-script.sqlite3 --verify --publish --flow … --label …`.
+- Share over ngrok and run the full QA checklist: [`docs/WEB_QA.md`](docs/WEB_QA.md).
+
+Keys live only in the git-ignored `.env.local` (mode 600) and the backend process, never in the browser bundle. Live mode accepts only the configured buyer and seller wallets. Each buyer wallet can start 20 negotiations an hour (`NEGOTIATIONS_PER_HOUR`).
+
+## Tests
+
+```sh
+.venv/bin/python -m pytest -q backend/tests blockchain/tests     # 58 tests: API rules, wallet auth, Kiln parsing/retries, signing, local EVM
 (cd frontend && npm test && npm run build)
 ```
 
-Kiln 에이전트 테스트는 가짜 HTTP 응답으로 `<think>` 처리, 재질문, 429 재시도, 402 구분, 로그에 키가 없는지를 확인한다.
+## Built before vs. during the event
 
-## 대회 전 작업 공개 (Pre-built work disclosure)
+- **Before the event: nothing.** All code, contracts, data and docs in this repository were written during the event. The first commit is 2026-09-28 02:35 KST (`git log --reverse`).
+- **Third-party code used as-is**: FastAPI, Pydantic, web3.py, eth-account, OpenAI Python SDK (as the Kiln client), OpenZeppelin Contracts (ECDSA, EIP712), solc, React, Vite, viem, lucide-react.
+- **Media**: listing photos and clips from Wikimedia Commons (CC BY 3.0 / CC BY-SA 4.0), paper texture from ambientCG (CC0); credits in the app footer and [`DESIGN.md`](DESIGN.md). The three seeded listings, their receipts and warranty lookups are fictional samples made for the demo.
+- **Tools**: AI coding assistants (OpenAI Codex, Claude) were used during development.
 
-- 저장소의 코드와 문서는 모두 대회 기간에 작성했다. 첫 커밋은 2026-09-28 02:35(KST)이며 커밋 기록으로 확인할 수 있다.
-- 외부 라이브러리: FastAPI, Pydantic, web3.py, eth-account, OpenAI Python SDK(Kiln 호출용), OpenZeppelin Contracts(ECDSA·EIP712), solc, React, Vite, viem, lucide-react.
-- 사진·영상: Wikimedia Commons(CC BY 3.0 / CC BY-SA 4.0), 종이 질감 ambientCG(CC0). 출처 목록은 화면 하단과 [`DESIGN.md`](DESIGN.md).
-- 개발에 AI 코딩 도구(OpenAI Codex, Claude)를 사용했다.
+## Limits
 
-## 한계
+- Evidence is a written summary of what a file shows; the assessor checks consistency between summaries, not authenticity or whether a GPU works.
+- Testnet records only: no payment, escrow or delivery.
+- One seller MetaMask account stands in for the three demo sellers.
 
-- 데모 세션(`ALLOW_DEMO_SESSIONS=true`)은 인증이 아니다. 발표용 통제 환경에서만 켠다.
-- 증빙 파일 자체를 검증하지 않는다. 테스트넷 기록이며 결제나 실물 거래가 아니다.
-- relayer 키는 테스트넷 전용이다. 메인넷 키를 쓰지 않는다.
+## Repository
 
-## 저장소 구조
-
-| 경로 | 내용 |
+| Path | What |
 |---|---|
-| `backend/` | FastAPI API v0.2 ([`api-spec.md`](api-spec.md)), wallet auth, Kiln 에이전트, 규칙 검사, SQLite |
-| `blockchain/` | EIP-712 서명 데이터, relayer 어댑터, 배포 스크립트, 배포 기록 |
-| `contracts/` | AgreementRegistry (Solidity 0.8.28) |
-| `frontend/` | React 웹. `/`가 실제 API에 연결된 메인 앱(`src/connected/`), `?mode=console`은 API 콘솔, `?mode=mock`은 오프라인 디자인 시안 ([`DESIGN.md`](DESIGN.md)) |
-| `scripts/` | 비밀값 설정, 배포, Kiln 점검, 실행, 증빙 내보내기 |
-| `docs/` | 증빙 (`PROOF.md`, `proof/`) 및 웹 QA 안내 |
+| `backend/` | FastAPI API v0.2 ([`api-spec.md`](api-spec.md)): wallet sign-in, Kiln agents, rule checks, SQLite store |
+| `blockchain/` | EIP-712 payloads, relayer adapter, deploy script, deployment record |
+| `contracts/` | `AgreementRegistry` (Solidity 0.8.28) |
+| `frontend/` | React app. `/` is the live app (`src/connected/`), `?mode=console` an API console, `?mode=mock` the offline design ([`DESIGN.md`](DESIGN.md)) |
+| `scripts/` | secrets setup, deploy, Kiln smoke test, backend runner, scripted flows, proof export |
+| `docs/` | [`PROOF.md`](docs/PROOF.md), `proof/` raw logs, [`WEB_QA.md`](docs/WEB_QA.md) |
