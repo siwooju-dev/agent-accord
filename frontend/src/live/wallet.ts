@@ -21,6 +21,19 @@ export async function connectWallet(): Promise<WalletState> {
   return { address, chainId: await wallet.getChainId() };
 }
 
+/** Opens MetaMask's account picker so the person chooses which account this site gets. */
+export async function chooseWalletAccount(): Promise<WalletState> {
+  if (!window.ethereum) throw new Error("브라우저 지갑을 찾지 못했습니다. MetaMask를 설치하거나 켜주세요.");
+  try {
+    await window.ethereum.request({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] } as never);
+  } catch (error) {
+    const code = (error as { code?: number }).code;
+    if (code === 4001) throw new Error("지갑 계정 선택을 취소했어요.");
+    // Wallets without the permissions API fall back to the plain account request below.
+  }
+  return connectWallet();
+}
+
 export async function currentWallet(): Promise<WalletState | null> {
   if (!window.ethereum) return null;
   const wallet = client();

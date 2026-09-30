@@ -93,7 +93,7 @@ function listingOfItem(item: string | null) {
 }
 
 function App() {
-  const [look, setLook] = useState<LookId>(readStoredLook);
+  const [look] = useState<LookId>(readStoredLook);
   const [page, setPage] = useState<PageKey>("overview");
   const [role, setRole] = useState<UserRole>("buyer");
   const [intent, setIntent] = useState<BuyerIntent>(DEMO_BUYER_INTENT);
@@ -125,17 +125,6 @@ function App() {
   const closeSheet = useCallback(() => setSheet(null), []);
 
   useEffect(() => storeLook(look), [look]);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const index = ["1", "2"].indexOf(event.key);
-      if (index >= 0) setLook(LOOKS[index].id);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
     return () => window.clearInterval(timer);
@@ -284,7 +273,6 @@ function App() {
 
   return (
     <div className="app">
-      <LookBar look={look} setLook={setLook} />
       <header className="nav">
         <button className="brand" type="button" onClick={() => setPage("overview")} aria-label="개요로 이동">
           <BrandMark />

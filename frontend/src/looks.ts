@@ -1,5 +1,5 @@
-/** Design directions ("시안") the reviewer can switch between from the top bar. */
-export type LookId = "clear" | "studio";
+/** The app ships one look (A · Clear). Kept as data so tokens stay in one place. */
+export type LookId = "clear";
 
 export interface Look {
   id: LookId;
@@ -20,15 +20,6 @@ export const LOOKS: Look[] = [
     swatch: ["#ffffff", "#3182f6", "#191f28"],
     dark: false,
     themeColor: "#f2f4f6",
-  },
-  {
-    id: "studio",
-    key: "D",
-    name: "Studio",
-    tagline: "하드웨어 제품 같은 무광 그레이 · 오렌지",
-    swatch: ["#e7e7e3", "#ff5a1f", "#111111"],
-    dark: false,
-    themeColor: "#e7e7e3",
   },
 ];
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { BackendChip, BrandMark, Card, EvidenceList, HeroBento, LookBar, PageHead, StatusPill } from "../App";
+import { BackendChip, BrandMark, Card, EvidenceList, HeroBento, PageHead, StatusPill } from "../App";
 import { HashDie } from "../components/HashDie";
 import { Icon } from "../components/Icon";
 import { Img } from "../components/Img";
@@ -13,10 +13,9 @@ import type {
   Negotiation, PublicListing, Role,
 } from "../live/types";
 import {
-  connectWallet, currentWallet, signApproval, signLoginMessage, switchToBaseSepolia, watchWallet,
+  chooseWalletAccount, connectWallet, currentWallet, signApproval, signLoginMessage, switchToBaseSepolia, watchWallet,
   type WalletState,
 } from "../live/wallet";
-import { LOOKS, readStoredLook, storeLook, type LookId } from "../looks";
 import type { Evidence, PageKey } from "../types";
 import "../App.css";
 import "./connected.css";
@@ -128,7 +127,6 @@ type OpenSheet = (listingId: string, itemId?: string) => void;
 /* ───────────── app ───────────── */
 
 export default function ConnectedApp() {
-  const [look, setLook] = useState<LookId>(readStoredLook);
   const [page, setPage] = useState<PageKey>("overview");
   const [session, setSession] = useState<DemoSession | null>(null);
   const [wallet, setWallet] = useState<WalletState | null>(null);
@@ -176,18 +174,6 @@ export default function ConnectedApp() {
     }
   }
 
-  useEffect(() => storeLook(look), [look]);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const index = ["1", "2"].indexOf(event.key);
-      if (index >= 0) setLook(LOOKS[index].id);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 15000);
     return () => window.clearInterval(timer);
@@ -313,7 +299,8 @@ export default function ConnectedApp() {
   /* ── actions ── */
 
   const login = (next: Role) => perform("지갑 로그인", async () => {
-    let connected = await connectWallet();
+    // Let the person pick the MetaMask account for this role (buyer = account 1, seller = account 2).
+    let connected = await chooseWalletAccount();
     setWallet(connected);
     if (connected.chainId !== 84532) {
       const switched = await switchToBaseSepolia();
@@ -321,7 +308,15 @@ export default function ConnectedApp() {
       connected = switched;
       setWallet(switched);
     }
-    const challenge = await api.createAuthChallenge(connected.address, next);
+    let challenge;
+    try {
+      challenge = await api.createAuthChallenge(connected.address, next);
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.code === "AUTH_WALLET_NOT_ALLOWED") {
+        throw new Error(`지금 선택된 계정 ${short(connected.address)}은 ${next === "buyer" ? "구매자" : "판매자"} 지갑이 아니에요. MetaMask에서 ${next === "buyer" ? "구매자" : "판매자"} 계정을 선택해 이 사이트에 연결한 뒤 다시 눌러주세요.`);
+      }
+      throw cause;
+    }
     const signature = await signLoginMessage(challenge.message, connected.address);
     const created = await api.createWalletSession(challenge.challenge_id, signature);
     clearFlow();
@@ -466,7 +461,6 @@ export default function ConnectedApp() {
 
   return (
     <div className="app connected">
-      <LookBar look={look} setLook={setLook} />
       <header className="nav">
         <button className="brand" type="button" onClick={() => setPage("overview")} aria-label="개요로 이동">
           <BrandMark />
@@ -871,7 +865,7 @@ function SellerListingForm({ catalog, session, busy, onCreate }: {
   const [floor, setFloor] = useState("1900000");
   const [shipping, setShipping] = useState("20000");
   const [earliest, setEarliest] = useState(localDay(2));
-  const [condition, setCondition] = useState("사용 12개월 · 박스 포함 (판매자 주장)");
+  const [condition, setCondition] = useState("");
   const [warranty, setWarranty] = useState("2027-02-14");
   const [picked, setPicked] = useState<string[]>([]);
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -881,6 +875,7 @@ function SellerListingForm({ catalog, session, busy, onCreate }: {
       shipping_fee_krw: Number(shipping), earliest_delivery_at: new Date(`${earliest}T12:00:00`).toISOString(),
       condition_text: condition.trim(), warranty_end: warranty || null, stock_status: "available", evidence_ids: picked,
     });
+    setCondition(""); setPicked([]);
   };
   return (
     <div className="split">
@@ -901,7 +896,7 @@ function SellerListingForm({ catalog, session, busy, onCreate }: {
         </div>
         <div className="field-row">
           <label className="field"><span>보증 만료일</span><input type="date" value={warranty} onChange={(e) => setWarranty(e.currentTarget.value)} /></label>
-          <label className="field"><span>상태 설명</span><input value={condition} onChange={(e) => setCondition(e.currentTarget.value)} required maxLength={400} /></label>
+          <label className="field"><span>상태 설명</span><input value={condition} onChange={(e) => setCondition(e.currentTarget.value)} required maxLength={400} placeholder="예: 사용 8개월 · 채굴 이력 없음 · 박스 포함" /></label>
         </div>
         <label className="field private seller">
           <span>나의 최저가 <em><Icon name="lock" size={11} /> 나만 보기</em></span>

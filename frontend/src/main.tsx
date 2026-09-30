@@ -5,9 +5,9 @@ import './looks.css'
 import App from './App.tsx'
 import LiveRoute from './live/LiveRoute.tsx'
 import ConnectedApp from './connected/ConnectedApp.tsx'
-import { readStoredLook, storeLook } from './looks'
+import { storeLook } from './looks'
 
-storeLook(readStoredLook())
+storeLook('clear')
 
 // `/` is the product connected to the live API. `?mode=console` is the plain API console, `?mode=mock` the offline design.
 const mode = new URLSearchParams(window.location.search).get('mode')
