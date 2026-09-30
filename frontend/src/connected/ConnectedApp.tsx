@@ -27,11 +27,19 @@ const MEDIA_ID: Record<string, string> = {
   "listing-demo-1": "listing-01",
   "listing-demo-2": "listing-02",
   "listing-demo-3": "listing-03",
+  "listing-demo-4": "listing-04",
+  "listing-demo-5": "listing-05",
+  "listing-demo-6": "listing-06",
+  "listing-demo-7": "listing-07",
 };
 const SELLER_NAME: Record<string, string> = {
   "seller-demo-1": "셀러 01",
   "seller-demo-2": "셀러 02",
   "seller-demo-3": "셀러 03",
+  "seller-demo-4": "셀러 04",
+  "seller-demo-5": "셀러 05",
+  "seller-demo-6": "셀러 06",
+  "seller-demo-7": "셀러 07",
 };
 const KINDS: Evidence["kind"][] = ["video", "receipt", "serial", "warranty"];
 const EXPLORER = "https://sepolia.basescan.org";
@@ -975,7 +983,7 @@ function NegotiationPage({
     return {
       id: listing.id,
       code: sellerName(listing.seller_id),
-      title: listing.title.replace("RTX 4090 ", ""),
+      title: listing.title.replace(`${listing.gpu_model} `, "").replace(listing.gpu_model, "") || listing.title,
       ask: listing.asking_price_krw + listing.shipping_fee_krw,
       offer: offer?.total_krw ?? listing.asking_price_krw + listing.shipping_fee_krw,
       status: offer ? "pass" : "block",

@@ -360,7 +360,7 @@ class Store:
         return nonce
 
     def seed_demo_listings(self, actors: dict[str, dict[str, str]]) -> None:
-        """Three demo RTX 4090 listings that mirror the frontend demo. All data is fictional."""
+        """Seed the demo catalog (three RTX 4090 listings plus one listing per extra seller). All data is fictional."""
         with self.transaction() as conn:
             for fixture in DEMO_LISTINGS:
                 if self.get("listing", fixture["listing_id"], conn) is not None:
@@ -372,7 +372,7 @@ class Store:
                 payload = {
                     "seller_id": fixture["seller_id"],
                     "seller_wallet": actor["wallet_address"].lower(),
-                    "gpu_model": "RTX 4090",
+                    "gpu_model": fixture.get("gpu_model", "RTX 4090"),
                     "title": fixture["title"],
                     "asking_price_krw": fixture["ask"],
                     "shipping_fee_krw": fixture["shipping"],
@@ -437,6 +437,53 @@ DEMO_LISTINGS: list[dict[str, Any]] = [
              "summary": "10초 작동 영상: RGB 점등, 벤치마크 실행 화면 (데모 요약)."},
             {"id": "evidence-07", "kind": "receipt", "label": "구매 영수증",
              "summary": "카드 영수증 스캔: 상호는 보이나 구매 날짜 판독 불가."},
+        ],
+    },    {
+        "seller_id": "seller-demo-4", "listing_id": "listing-demo-4", "title": "RTX 3090 Eagle OC",
+        "gpu_model": "RTX 3090", "ask": 820_000, "floor": 760_000, "shipping": 15_000, "ships_in_days": 3,
+        "warranty_end": "2026-11-30",
+        "condition": "데모 매물 · 사용 3년 · 서멀 패드 교체 · 채굴 이력 없음 (판매자 주장)",
+        "evidence": [
+            {"id": "evidence-08", "kind": "receipt", "label": "구매 영수증",
+             "summary": "2021-03 온라인 주문 캡처: 상품명 GIGABYTE RTX 3090 Eagle OC 24G."},
+            {"id": "evidence-09", "kind": "video", "label": "GPU 작동 영상",
+             "summary": "30분 부하 테스트 영상: 코어 72°C, 메모리 정션 96°C로 높음 (데모 요약)."},
+        ],
+    },
+    {
+        "seller_id": "seller-demo-5", "listing_id": "listing-demo-5", "title": "RTX 4070 Aero OC",
+        "gpu_model": "RTX 4070", "ask": 690_000, "floor": 640_000, "shipping": 10_000, "ships_in_days": 2,
+        "warranty_end": "2027-06-30",
+        "condition": "데모 매물 · 사용 10개월 · 화이트 에디션 · 박스 포함 (판매자 주장)",
+        "evidence": [
+            {"id": "evidence-10", "kind": "serial", "label": "제품 시리얼 사진",
+             "summary": "라벨 사진 선명: 모델명 GV-N4070AERO OC-12GD 판독 가능."},
+            {"id": "evidence-11", "kind": "warranty", "label": "보증 조회",
+             "summary": "시리얼 보증 조회(데모 응답): RTX 4070 Aero OC, 보증 2027-06-30까지. 매물 정보와 일치."},
+        ],
+    },
+    {
+        "seller_id": "seller-demo-6", "listing_id": "listing-demo-6", "title": "Radeon RX 7900 XTX TUF",
+        "gpu_model": "RX 7900 XTX", "ask": 1_080_000, "floor": 1_000_000, "shipping": 20_000, "ships_in_days": 5,
+        "warranty_end": "2027-01-15",
+        "condition": "데모 매물 · 사용 1년 · 코일 소음 약간 (판매자 주장)",
+        "evidence": [
+            {"id": "evidence-12", "kind": "video", "label": "GPU 작동 영상",
+             "summary": "게임 벤치마크 3분 영상: 프레임 정상, 고부하에서 코일 소음이 들림 (데모 요약)."},
+            {"id": "evidence-13", "kind": "receipt", "label": "구매 영수증",
+             "summary": "2024-01 온라인 주문 캡처: 상품명 ASUS TUF RX 7900 XTX OC. 판매자 제출본."},
+        ],
+    },
+    {
+        "seller_id": "seller-demo-7", "listing_id": "listing-demo-7", "title": "RTX 4080 SUPER Founders Edition",
+        "gpu_model": "RTX 4080 SUPER", "ask": 1_380_000, "floor": 1_300_000, "shipping": 0, "ships_in_days": 1,
+        "warranty_end": "2027-02-28",
+        "condition": "데모 매물 · 사용 7개월 · 무료 배송 (판매자 주장)",
+        "evidence": [
+            {"id": "evidence-14", "kind": "receipt", "label": "구매 영수증",
+             "summary": "2024-02 구매 영수증: 상품명 RTX 4080 SUPER Founders Edition."},
+            {"id": "evidence-15", "kind": "warranty", "label": "보증 조회",
+             "summary": "시리얼 보증 조회(데모 응답): 조회된 모델명이 RTX 4080 (SUPER 아님). 매물 제목과 불일치."},
         ],
     },
 ]

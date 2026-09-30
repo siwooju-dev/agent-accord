@@ -97,6 +97,14 @@ export function EvidenceStatus({ status }: { status: Evidence["status"] }) {
 
 type Item = { kind: "photo"; id: string; photo: Photo } | { kind: "evidence"; id: string; evidence: Evidence };
 
+/** Listings that have photos but no designed evidence views (the live catalog's extra sellers). */
+const PHOTO_ONLY_LISTINGS: Record<string, { model: string; sellerName: string }> = {
+  "listing-04": { model: "RTX 3090 Eagle OC", sellerName: "셀러 04" },
+  "listing-05": { model: "RTX 4070 Aero OC", sellerName: "셀러 05" },
+  "listing-06": { model: "Radeon RX 7900 XTX TUF", sellerName: "셀러 06" },
+  "listing-07": { model: "RTX 4080 SUPER Founders Edition", sellerName: "셀러 07" },
+};
+
 export function listingItems(listingId: string): Item[] {
   const listing = DEMO_LISTINGS.find((entry) => entry.id === listingId);
   const photos: Item[] = (LISTING_PHOTOS[listingId] ?? []).map((photo) => ({ kind: "photo", id: photo.id, photo }));
@@ -125,7 +133,7 @@ export function ListingSheet({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const listing = DEMO_LISTINGS.find((entry) => entry.id === listingId);
+  const listing = DEMO_LISTINGS.find((entry) => entry.id === listingId) ?? PHOTO_ONLY_LISTINGS[listingId];
   const items = useMemo(() => listingItems(listingId), [listingId]);
   const index = Math.max(0, items.findIndex((item) => item.id === itemId));
   const item = items[index];

@@ -88,11 +88,15 @@ class Settings:
         raw_actors = os.getenv("DEMO_ACTORS_JSON", "").strip()
         buyer_wallet = os.getenv("DEMO_BUYER_WALLET", "").strip()
         seller_wallet = os.getenv("DEMO_SELLER_WALLET", "").strip()
+        extra_sellers = [item.strip() for item in os.getenv("DEMO_EXTRA_SELLER_WALLETS", "").split(",") if item.strip()]
         if not raw_actors and buyer_wallet and seller_wallet:
-            # Two browser-wallet accounts: one buyer, and one seller account shared by the three demo sellers.
+            # Browser-wallet accounts: one buyer, one seller account shared by demo sellers 1-3, and
+            # optional extra seller accounts that become demo sellers 4, 5, ... (one listing each).
             raw_actors = json.dumps({
                 "buyer-demo": {"role": "buyer", "wallet_address": buyer_wallet},
                 **{f"seller-demo-{index}": {"role": "seller", "wallet_address": seller_wallet} for index in (1, 2, 3)},
+                **{f"seller-demo-{index}": {"role": "seller", "wallet_address": wallet}
+                   for index, wallet in enumerate(extra_sellers, start=4)},
             })
         if raw_actors:
             parsed = json.loads(raw_actors)

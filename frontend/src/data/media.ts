@@ -23,12 +23,22 @@ import strixRunPoster from "../assets/media/ev-strix-run.jpg";
 import strixRunClip from "../assets/media/ev-strix-run.mp4";
 import strixRunWebm from "../assets/media/ev-strix-run.webm";
 import paper from "../assets/media/paper.jpg";
+import r3090Front from "../assets/media/l4-3090-front.jpg";
+import r3090Flat from "../assets/media/l4-3090-flat.jpg";
+import r3090Io from "../assets/media/l4-3090-io.jpg";
+import r4070Fans from "../assets/media/l5-4070-back.jpg";
+import r4070Top from "../assets/media/l5-4070-angle.jpg";
+import r4070Side from "../assets/media/l5-4070-front.jpg";
+import rx7900Front from "../assets/media/l6-7900-rig.jpg";
+import rx7900Back from "../assets/media/l6-7900-tuf.jpg";
+import r4080Line from "../assets/media/l7-4080-a.jpg";
+import r4080Stack from "../assets/media/l7-4080-b.jpg";
 
 export const PAPER_TEXTURE = paper;
 
 export interface Credit {
   author: string;
-  license: "CC BY 3.0" | "CC BY-SA 4.0" | "CC0";
+  license: "CC BY 3.0" | "CC BY 4.0" | "CC BY-SA 4.0" | "CC0";
   title: string;
   url: string;
   edited?: string;
@@ -194,6 +204,104 @@ export const LISTING_PHOTOS: Record<string, Photo[]> = {
       alt: "백플레이트 컷아웃 사이로 보이는 GPU 뒷면 부품",
       caption: "뒷면 · 백플레이트",
       credit: C.benlisquare("Underside of Asus Strix RTX 4090", "Underside_of_Asus_Strix_RTX_4090.jpg"),
+    },
+  ],
+  "listing-04": [
+    {
+      id: "l4-front",
+      src: r3090Front,
+      w: 960,
+      h: 640,
+      alt: "팬 3개가 보이는 GIGABYTE RTX 3090 Eagle OC 전면",
+      caption: "전면 · 팬 3개",
+      credit: { author: "PantheraLeo1359531", license: "CC BY 4.0", title: "Gigabyte GeForce RTX 3090 Eagle OC 24G, 24576 MiB GDDR6X Front 20201114 DSC5880", url: "https://commons.wikimedia.org/wiki/File:Gigabyte_GeForce_RTX_3090_Eagle_OC_24G,_24576_MiB_GDDR6X_Front_20201114_DSC5880.jpg", edited: "리사이즈" },
+    },
+    {
+      id: "l4-ruler",
+      src: r3090Flat,
+      w: 960,
+      h: 640,
+      alt: "줄자 옆에 눕혀 둔 RTX 3090 Eagle OC",
+      caption: "길이 실측",
+      credit: { author: "PantheraLeo1359531", license: "CC BY 4.0", title: "Gigabyte GeForce RTX 3090 Eagle OC 24G, 24576 MiB GDDR6X liegend Front mit Messung 20201114 DSC5942", url: "https://commons.wikimedia.org/wiki/File:Gigabyte_GeForce_RTX_3090_Eagle_OC_24G,_24576_MiB_GDDR6X_liegend_Front_mit_Messung_20201114_DSC5942.jpg", edited: "리사이즈" },
+    },
+    {
+      id: "l4-io",
+      src: r3090Io,
+      w: 960,
+      h: 640,
+      alt: "RTX 3090 Eagle OC 출력 단자",
+      caption: "출력 단자",
+      credit: { author: "PantheraLeo1359531", license: "CC BY 4.0", title: "Gigabyte GeForce RTX 3090 Eagle OC 24G, 24576 MiB GDDR6X Anschlüsse 20201114", url: "https://commons.wikimedia.org/wiki/File:Gigabyte_GeForce_RTX_3090_Eagle_OC_24G,_24576_MiB_GDDR6X_Anschl%C3%BCsse_20201114.jpg", edited: "리사이즈" },
+    },
+  ],
+  "listing-05": [
+    {
+      id: "l5-fans",
+      src: r4070Fans,
+      w: 960,
+      h: 597,
+      alt: "흰색 RTX 4070 Aero OC의 팬 3개",
+      caption: "전면 · 팬 3개",
+      credit: { author: "Jacek Halicki", license: "CC BY-SA 4.0", title: "2023 Gigabyte GeForce RTX 4070 Aero OC 12GB (3)", url: "https://commons.wikimedia.org/wiki/File:2023_Gigabyte_GeForce_RTX_4070_Aero_OC_12GB_(3).jpg", edited: "리사이즈" },
+    },
+    {
+      id: "l5-top",
+      src: r4070Top,
+      w: 960,
+      h: 620,
+      alt: "위에서 본 RTX 4070 Aero OC 백플레이트",
+      caption: "윗면 · 백플레이트",
+      credit: { author: "Jacek Halicki", license: "CC BY-SA 4.0", title: "2023 Gigabyte GeForce RTX 4070 Aero OC 12GB (2)", url: "https://commons.wikimedia.org/wiki/File:2023_Gigabyte_GeForce_RTX_4070_Aero_OC_12GB_(2).jpg", edited: "리사이즈" },
+    },
+    {
+      id: "l5-side",
+      src: r4070Side,
+      w: 960,
+      h: 541,
+      alt: "옆에서 본 RTX 4070 Aero OC",
+      caption: "옆면 · 방열판",
+      credit: { author: "Jacek Halicki", license: "CC BY-SA 4.0", title: "2023 Gigabyte GeForce RTX 4070 Aero OC 12GB (1)", url: "https://commons.wikimedia.org/wiki/File:2023_Gigabyte_GeForce_RTX_4070_Aero_OC_12GB_(1).jpg", edited: "리사이즈" },
+    },
+  ],
+  "listing-06": [
+    {
+      id: "l6-front",
+      src: rx7900Front,
+      w: 960,
+      h: 480,
+      alt: "책상 위 ASUS TUF Radeon RX 7900 XTX 전면",
+      caption: "전면 · 팬 3개",
+      credit: { author: "MoreThanTech", license: "CC BY 3.0", title: "LA MIGLIOR GPU AMD CONTRO LA MIA LIBRERIA STEAM IN 4K + RT! 🚀 (1920p 60fps VP9-128kbit AAC)-00.00.02.579", url: "https://commons.wikimedia.org/wiki/File:LA_MIGLIOR_GPU_AMD_CONTRO_LA_MIA_LIBRERIA_STEAM_IN_4K_%2B_RT!_%F0%9F%9A%80_(1920p_60fps_VP9-128kbit_AAC)-00.00.02.579.png", edited: "영상 캡처 · 리사이즈" },
+    },
+    {
+      id: "l6-back",
+      src: rx7900Back,
+      w: 960,
+      h: 480,
+      alt: "ASUS TUF RX 7900 XTX 백플레이트",
+      caption: "백플레이트",
+      credit: { author: "MoreThanTech", license: "CC BY 3.0", title: "File-MoreThanTech ASUS TUF Gaming Radeon RX 7900 XTX OC Edition 24GB GDDR6 02", url: "https://commons.wikimedia.org/wiki/File:File-MoreThanTech_ASUS_TUF_Gaming_Radeon_RX_7900_XTX_OC_Edition_24GB_GDDR6_02.png", edited: "영상 캡처 · 리사이즈" },
+    },
+  ],
+  "listing-07": [
+    {
+      id: "l7-line",
+      src: r4080Line,
+      w: 960,
+      h: 540,
+      alt: "RTX 4080 SUPER Founders Edition과 비교 카드",
+      caption: "가운데 · RTX 4080 SUPER FE",
+      credit: { author: "极客湾Geekerwan", license: "CC BY 3.0", title: "Video über die RTX 4080 Super und Vergleichskarten (极客湾Geekerwan) 05", url: "https://commons.wikimedia.org/wiki/File:Video_%C3%BCber_die_RTX_4080_Super_und_Vergleichskarten_(%E6%9E%81%E5%AE%A2%E6%B9%BEGeekerwan)_05.png", edited: "영상 캡처 · 리사이즈" },
+    },
+    {
+      id: "l7-stack",
+      src: r4080Stack,
+      w: 960,
+      h: 540,
+      alt: "나란히 놓인 Founders Edition 카드",
+      caption: "측면 비교",
+      credit: { author: "极客湾Geekerwan", license: "CC BY 3.0", title: "Video über die RTX 4080 Super und Vergleichskarten (极客湾Geekerwan) 06", url: "https://commons.wikimedia.org/wiki/File:Video_%C3%BCber_die_RTX_4080_Super_und_Vergleichskarten_(%E6%9E%81%E5%AE%A2%E6%B9%BEGeekerwan)_06.png", edited: "영상 캡처 · 리사이즈" },
     },
   ],
 };
