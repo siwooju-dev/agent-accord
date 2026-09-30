@@ -86,6 +86,9 @@ const EVENT_KO: Record<string, string> = {
   NO_MATCH: "맞는 매물 없음",
   BLOCKED: "모든 제안 차단",
 };
+const ACTION_KO: Record<string, string> = {
+  offer: "제안", skip: "이 매물은 건너뜀", accept: "수락", counter: "역제안", reject: "거절",
+};
 const STEP_KO: Record<string, string> = { assessment: "증빙 검토", buyer_offer: "구매 제안", seller_reply: "판매 응답", buyer_reply: "구매 답변" };
 const ACTOR_KO: Record<string, string> = { assessor: "검토 에이전트", buyer: "구매 에이전트", seller: "판매 에이전트" };
 const VERDICT_STATUS: Record<string, Evidence["status"]> = { consistent: "checked", conflicted: "conflicted", unverified: "unknown" };
@@ -979,10 +982,12 @@ function NegotiationPage({
       reason: offer ? undefined : running ? "협상 중" : REASON_KO[reason ?? ""] ?? "제안 없음",
     };
   });
-  const current = selectedListing ?? negotiation.offers[0]?.listing_id ?? candidates[0]?.id ?? "";
+  const active = Object.keys(negotiation.transcripts ?? {}).at(-1) ?? negotiation.assessments.at(-1)?.listing_id;
+  const current = selectedListing ?? (running ? active : undefined) ?? negotiation.offers[0]?.listing_id ?? active ?? candidates[0]?.id ?? "";
   const listing = ctx.catalog.find((item) => item.id === current);
   const assessment = negotiation.assessments.find((item) => item.listing_id === current);
   const offer = negotiation.offers.find((item) => item.listing_id === current);
+  const transcript = negotiation.transcripts?.[current] ?? [];
   const chosen = negotiation.offers.find((item) => item.id === negotiation.selected_offer_id);
   const usage = audit?.model_usage ?? [];
   const cost = typeof audit?.totals.cost_usd === "number" ? audit.totals.cost_usd : null;
@@ -1026,9 +1031,26 @@ function NegotiationPage({
                   ))}
                 </li>
               )}
+              {transcript.map((entry, index) => (
+                <li key={`${entry.actor}-${index}`} className={"msg " + entry.actor}>
+                  <span className="msg-who">
+                    {entry.actor === "buyer" ? "구매 에이전트" : "판매 에이전트"} · {ACTION_KO[entry.action] ?? entry.action}
+                  </span>
+                  {typeof entry.item_price_krw === "number" && (
+                    <p>
+                      상품가 <b>{money(entry.item_price_krw)}</b>
+                      {entry.delivery_by ? ` · ${day(entry.delivery_by)} 도착` : ""}
+                    </p>
+                  )}
+                  {entry.reason && <p className="msg-sub">“{entry.reason}”</p>}
+                </li>
+              ))}
+              {running && transcript.length < 4 && assessment && !offer && (
+                <li className="msg system typing"><span className="spinner" aria-hidden="true" /> 에이전트가 답하는 중…</li>
+              )}
               {offer && (
                 <li className={"msg " + (offer.proposer === "seller" ? "seller" : "buyer")}>
-                  <span className="msg-who">{offer.proposer === "seller" ? "판매 에이전트 역제안" : "구매 에이전트 제안 · 판매자 수락"} · {offer.round}라운드</span>
+                  <span className="msg-who">최종 제안 · {offer.round}라운드 · 배송비 포함</span>
                   <p><b>{money(offer.total_krw)}</b> (상품 {money(offer.item_price_krw)} + 배송 {money(offer.shipping_fee_krw)}) · {day(offer.delivery_by)} 도착</p>
                   <p className="msg-sub">{offer.rationale}</p>
                 </li>

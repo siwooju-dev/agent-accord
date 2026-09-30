@@ -228,6 +228,7 @@ class NegotiationView(NegotiationStartView):
     offers: list[dict[str, Any]] = Field(default_factory=list)
     blocked_events: list[dict[str, Any]] = Field(default_factory=list)
     selected_offer_id: str | None = None
+    transcripts: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
 
 
 class ChainView(BaseModel):

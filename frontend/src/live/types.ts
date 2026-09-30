@@ -119,6 +119,16 @@ export interface Negotiation {
   blocked_events: Array<{ reason_code: string }>;
   selected_offer_id: string | null;
   agreement_id: string | null;
+  /** What each agent said per listing; seller-agent amounts are masked by the server. */
+  transcripts?: Record<string, TranscriptEntry[]>;
+}
+
+export interface TranscriptEntry {
+  actor: "buyer" | "seller";
+  action: "offer" | "skip" | "accept" | "counter" | "reject";
+  item_price_krw?: number;
+  delivery_by?: string;
+  reason?: string;
 }
 
 export interface NegotiationStart {

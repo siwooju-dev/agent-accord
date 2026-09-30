@@ -362,7 +362,7 @@ def test_live_settings_pin_base_sepolia_and_distinct_demo_roles(tmp_path):
 def test_live_buyer_negotiations_are_bounded_per_hour(tmp_path):
     buyer, seller = Account.create(), Account.create()
     settings = Settings(
-        mode="live", chain_mode="live", allow_demo_sessions=False,
+        mode="live", chain_mode="live", allow_demo_sessions=False, negotiations_per_hour=3,
         database_path=str(tmp_path / "live-quota.sqlite3"), actors={
             "buyer-demo": {"role": "buyer", "wallet_address": buyer.address},
             "seller-demo-1": {"role": "seller", "wallet_address": seller.address},
@@ -434,6 +434,7 @@ def test_full_mock_flow_requires_both_signatures_and_never_claims_chain_record(d
     assert negotiation["status"] == "AWAITING_APPROVALS"
     assert negotiation["agreement_id"]
     assert negotiation["offers"]
+    assert all(entry["actor"] in {"buyer", "seller"} for entries in negotiation["transcripts"].values() for entry in entries)
     assert all(offer["round"] == 1 and offer["proposer"] == "buyer"
                for offer in negotiation["offers"])
     assert all("min_item_price_krw" not in offer and "seller_wallet" not in offer

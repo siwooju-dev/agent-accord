@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import ipaddress
 import json
 import secrets
@@ -72,6 +73,13 @@ ERROR_MESSAGES = {
     "AUTH_RATE_LIMITED": "로그인 요청이 많습니다. 잠시 후 다시 시도하세요.",
     "NEGOTIATION_RATE_LIMITED": "협상 요청 한도에 도달했습니다. 잠시 후 다시 시도하세요.",
 }
+
+
+def _mask_numbers(text: Any) -> str | None:
+    """Hide amounts in seller-agent text: the seller agent sees the private floor price."""
+    if not isinstance(text, str) or not text.strip():
+        return None
+    return re.sub(r"[₩$]?\s*\d[\d,.]*\s*(만\s*원|만|원|KRW)?", "…", text).strip()[:300]
 
 
 def _hash_token(value: str) -> str:
@@ -521,6 +529,16 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                                 decision="blocked", reason_code="NO_MATCH", conn=conn)
             return
 
+        # What each agent said, per listing, so the buyer can follow the negotiation as it happens.
+        transcripts: dict[str, list[dict[str, Any]]] = {}
+
+        def say(listing_id: str, entry: dict[str, Any]) -> None:
+            transcripts.setdefault(listing_id, []).append(
+                {key: value for key, value in entry.items() if value not in (None, "")})
+            negotiation["transcripts"] = transcripts
+            with store.transaction() as conn:
+                store.put("negotiation", negotiation_id, negotiation["buyer_id"], negotiation, conn)
+
         def keep_usage(usage: dict[str, Any] | None) -> None:
             if not usage:
                 return
@@ -559,6 +577,11 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                 })
                 buyer_offer, buyer_usage = app.state.agent.buyer_offer(intent, listing, assessment)
                 keep_usage(buyer_usage)
+                say(listing["id"], {
+                    "actor": "buyer", "action": "skip" if buyer_offer.get("skip") else "offer",
+                    "item_price_krw": buyer_offer.get("item_price_krw"), "delivery_by": buyer_offer.get("delivery_by"),
+                    "reason": buyer_offer.get("reason"),
+                })
                 if buyer_offer.get("skip"):
                     blocked_events.append({"reason_code": "BUYER_AGENT_SKIPPED"})
                     store.add_event(
@@ -579,6 +602,13 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                     continue
                 seller_reply, seller_usage = app.state.agent.seller_reply(listing, buyer_offer)
                 keep_usage(seller_usage)
+                say(listing["id"], {
+                    "actor": "seller", "action": seller_reply["action"],
+                    "item_price_krw": seller_reply["item_price_krw"] if seller_reply["action"] != "reject" else None,
+                    "delivery_by": seller_reply.get("delivery_by") if seller_reply["action"] != "reject" else None,
+                    # The seller agent knows the private floor; never pass its numbers to the buyer's screen.
+                    "reason": _mask_numbers(seller_reply.get("reason")),
+                })
                 if seller_reply["action"] == "reject":
                     blocked_events.append({"reason_code": "SELLER_REJECTED"})
                     store.add_event(
@@ -594,6 +624,7 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
                         intent, listing, assessment, buyer_offer, seller_reply,
                     )
                     keep_usage(buyer_reply_usage)
+                    say(listing["id"], {"actor": "buyer", "action": buyer_reply["action"], "reason": buyer_reply.get("reason")})
                     if buyer_reply["action"] != "accept":
                         blocked_events.append({"reason_code": "BUYER_REJECTED_COUNTER"})
                         store.add_event(
@@ -967,7 +998,7 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
             if (settings.mode == "live" and store.count_recent_owned(
                     "negotiation", actor["actor_id"],
                     utc_stamp(utc_now() - timedelta(hours=1)), conn,
-            ) >= 3):
+            ) >= settings.negotiations_per_hour):
                 raise ApiError("NEGOTIATION_RATE_LIMITED", 429)
             negotiation_id, flow_id = new_id("neg"), new_id("flow")
             negotiation = {
@@ -1006,6 +1037,7 @@ def create_app(settings: Settings | None = None, *, database_path: str | None = 
             ],
             "selected_offer_id": negotiation["selected_offer_id"],
             "agreement_id": negotiation["agreement_id"],
+            "transcripts": negotiation.get("transcripts", {}),
         }
 
     @app.get("/api/agreements", response_model=dict[str, Any])

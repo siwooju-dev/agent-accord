@@ -70,6 +70,7 @@ class Settings:
     kiln_max_tokens: int = 1200
     kiln_log_path: str = ""
     kiln_thinking: bool = False
+    negotiations_per_hour: int = 20
     chain_rpc_url: str = "https://sepolia.base.org"
     chain_id: int = 84532
     chain_explorer_url: str = "https://sepolia.basescan.org"
@@ -118,6 +119,7 @@ class Settings:
             kiln_max_tokens=int(os.getenv("KILN_MAX_TOKENS", "1200")),
             kiln_log_path=os.getenv("KILN_LOG_PATH", str(ROOT / "data" / "kiln_calls.jsonl")),
             kiln_thinking=_env_bool("KILN_THINKING", False),
+            negotiations_per_hour=int(os.getenv("NEGOTIATIONS_PER_HOUR", "20")),
             chain_rpc_url=os.getenv("CHAIN_RPC_URL", "https://sepolia.base.org"),
             chain_id=int(os.getenv("CHAIN_ID", "84532")),
             chain_explorer_url=os.getenv("CHAIN_EXPLORER_URL", "https://sepolia.basescan.org").rstrip("/"),
